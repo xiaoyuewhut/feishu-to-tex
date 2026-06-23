@@ -133,8 +133,8 @@ def parse_element(elem):
         return {'type': 'quote', 'content': content}
     
     if tag == 'callout':
-        content = get_text(elem)
-        return {'type': 'callout', 'content': content}
+        from .callout import parse_callout
+        return parse_callout(elem)
     
     if tag == 'hr':
         return {'type': 'divider'}

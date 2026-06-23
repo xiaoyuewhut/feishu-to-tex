@@ -14,53 +14,6 @@ def calc_col_widths(rows, cols):
     def text_width(text):
         return sum(char_width(ch) for ch in str(text))
     
-    col_total_width = [0] * cols
-    col_max_width = [0] * cols
-    col_counts = [0] * cols
-    
-    for row in rows:
-        for i, cell in enumerate(row):
-            if i < cols:
-                w = text_width(cell)
-                col_total_width[i] += w
-                col_max_width[i] = max(col_max_width[i], w)
-                if w > 0:
-                    col_counts[i] += 1
-    
-    # 计算每列的平均宽度
-    col_avg_width = []
-    for i in range(cols):
-        if col_counts[i] > 0:
-            col_avg_width.append(col_total_width[i] / col_counts[i])
-        else:
-            col_avg_width.append(2)  # 默认最小宽度
-    
-    # 根据平均宽度计算列宽比例
-    total_avg = sum(col_avg_width)
-    col_widths = [(avg / total_avg) * 0.92 for avg in col_avg_width]
-    
-    # 确保最小列宽（至少占总宽度的8%）
-    min_width = 0.08
-    col_widths = [max(w, min_width) for w in col_widths]
-    
-    # 归一化
-    total_width = sum(col_widths)
-    col_widths = [w / total_width for w in col_widths]
-    
-    return col_widths
-
-
-def calc_col_widths(rows, cols):
-    """根据内容计算每列宽度比例"""
-    # 使用更精确的宽度计算：中文字符算2个宽度，其他算1个
-    def char_width(ch):
-        if '\u4e00' <= ch <= '\u9fff':
-            return 2  # 中文字符
-        return 1
-    
-    def text_width(text):
-        return sum(char_width(ch) for ch in str(text))
-    
     col_max_width = [0] * cols
     
     for row in rows:

@@ -42,7 +42,7 @@ def generate_tex(blocks):
             level = block.get('level', 1)
             cmd = ['section', 'subsection', 'subsubsection', 
                    'paragraph', 'subparagraph', 'subparagraph'][min(level - 1, 5)]
-            heading_text = strip_heading_number(block["content"])
+            heading_text = escape_tex(strip_heading_number(block["content"]))
             if heading_text:
                 # 在 section 和 subsection 前加分页符
                 if level <= 2:
@@ -93,10 +93,8 @@ def generate_tex(blocks):
             lines.append('')
         
         elif block_type == 'callout':
-            lines.append('\\begin{quote}')
-            lines.append(f'  \\textbf{{注意:}} {escape_tex(block["content"])}')
-            lines.append('\\end{quote}')
-            lines.append('')
+            from .callout import generate_callout_tex
+            lines.extend(generate_callout_tex(block))
         
         elif block_type == 'divider':
             lines.append('\\noindent\\rule{\\textwidth}{0.4pt}')
@@ -105,7 +103,15 @@ def generate_tex(blocks):
         elif block_type == 'image':
             src = block.get('src', '')
             alt = block.get('alt', '')
-            if src:
+            local_path = block.get('local_path', '')
+            if local_path:
+                lines.append('\\begin{figure}[htbp]')
+                lines.append('  \\centering')
+                lines.append(f'  \\includegraphics[width=0.8\\textwidth]{{{local_path}}}')
+                if alt:
+                    lines.append(f'  \\caption{{{escape_tex(alt)}}}')
+                lines.append('\\end{figure}')
+            elif src:
                 lines.append(f'% [图片: {alt or src}]')
             lines.append('')
         
@@ -183,6 +189,8 @@ def generate_main_tex(title, sections):
 
 def generate_style_file():
     """生成样式文件"""
+    from .callout import generate_callout_style
+    
     return r"""\NeedsTeXFormat{LaTeX2e}
 \ProvidesPackage{feishu}[2024/01/01 Feishu Document Style]
 
@@ -202,6 +210,7 @@ def generate_style_file():
 \RequirePackage{ragged2e}
 \RequirePackage{multirow}
 \RequirePackage{longtable}
+\RequirePackage{tcolorbox}
 
 \geometry{a4paper, margin=2.5cm}
 
@@ -209,6 +218,7 @@ def generate_style_file():
   colorlinks=true,
   linkcolor=blue,
   urlcolor=blue,
+  bookmarksnumbered=true,
 }
 
 \lstset{
@@ -226,7 +236,7 @@ def generate_style_file():
 % 表格样式：垂直居中 + 左对齐
 \newcolumntype{X}{>{\RaggedRight\arraybackslash}m{\hsize}}
 
-"""
+""" + generate_callout_style()
 
 
 def generate_latexmkrc():

@@ -16,9 +16,11 @@
 feishu2tex/          # 主包
 ├── __init__.py      # 包初始化
 ├── __main__.py      # CLI 入口 (python3 -m feishu2tex)
+├── callout.py       # 高亮块 (Callout) 解析与生成
 ├── feishu.py        # 飞书 API 调用和 XML 解析
 ├── tex.py           # LaTeX 代码生成
 ├── project.py       # 项目文件夹创建
+├── table.py         # 表格解析与生成
 └── utils.py         # 工具函数 (转义、清理等)
 convert.py           # 快捷入口脚本
 test/                # 测试输出 (gitignore)

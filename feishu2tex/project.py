@@ -29,6 +29,7 @@ def create_project(blocks, title, doc_id, output_dir):
     # 下载图片
     image_map = {}
     image_idx = 0
+    image_failed = 0
     warnings = []
     
     for block in blocks:
@@ -42,6 +43,7 @@ def create_project(blocks, title, doc_id, output_dir):
             if download_image(block['src'], filepath):
                 image_map[block['src']] = f'assets/images/{filename}'
             else:
+                image_failed += 1
                 warnings.append(f'图片下载失败: {block["src"]}')
                 image_map[block['src']] = None
     
@@ -124,7 +126,7 @@ def create_project(blocks, title, doc_id, output_dir):
         'total_blocks': len(blocks),
         'total_sections': len(sections),
         'total_images': image_idx,
-        'downloaded_images': image_idx - len(warnings),
+        'downloaded_images': image_idx - image_failed,
         'sections': [
             {
                 'file': f'sections/{str(i + 1).zfill(2)}-{sanitize_ascii(strip_heading_number(section.get("heading")) if section.get("heading") else "content")}.tex',
