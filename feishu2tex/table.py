@@ -94,42 +94,79 @@ def generate_table_tex(rows):
     # 计算合并信息
     merge_info = calc_merge_info(rows, cols)
     
-    # 生成表格内容
-    lines.append('\\begin{table}[htbp]')
-    lines.append('  \\centering')
-    lines.append('  \\small')
-    lines.append('  \\renewcommand{\\arraystretch}{1.4}')
-    lines.append('  \\resizebox{\\textwidth}{!}{%')
-    lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
-    lines.append('    \\toprule')
+    # 判断是否使用 longtable（超过 20 行）
+    use_longtable = len(rows) > 20
     
-    # 表头
-    header_cells = [f'\\textbf{{{escape_tex(str(cell))}}}' for cell in rows[0]]
-    lines.append(f'    {" & ".join(header_cells)} \\\\')
-    lines.append('    \\midrule')
-    
-    # 数据行
-    for r in range(1, len(rows)):
-        row = rows[r]
-        cells = []
+    if use_longtable:
+        # 长表格使用 longtable，统一字号
+        lines.append('\\small')
+        lines.append('\\renewcommand{\\arraystretch}{1.4}')
+        lines.append('\\begin{longtable}{' + col_spec + '}')
+        lines.append('  \\toprule')
+        header_cells = [f'\\textbf{{{escape_tex(str(cell))}}}' for cell in rows[0]]
+        lines.append(f'  {" & ".join(header_cells)} \\\\')
+        lines.append('  \\midrule')
+        lines.append('  \\endfirsthead')
+        lines.append('  \\toprule')
+        lines.append(f'  {" & ".join(header_cells)} \\\\')
+        lines.append('  \\midrule')
+        lines.append('  \\endhead')
+        lines.append('  \\midrule')
+        lines.append(f'  \\multicolumn{{{cols}}}{{r}}{{\\textit{{续下页}}}} \\\\')
+        lines.append('  \\endfoot')
+        lines.append('  \\bottomrule')
+        lines.append('  \\endlastfoot')
         
-        for c in range(cols):
-            info = merge_info[r][c]
-            if info is None:
-                cells.append('')
-            elif info[0] == 0:
-                cells.append('')
-            elif info[0] > 1:
-                cells.append(f'\\multirow{{{info[0]}}}{{*}}{{{escape_tex(info[1])}}}')
-            else:
-                cells.append(escape_tex(info[1]))
+        for r in range(1, len(rows)):
+            row = rows[r]
+            cells = []
+            for c in range(cols):
+                info = merge_info[r][c]
+                if info is None:
+                    cells.append('')
+                elif info[0] == 0:
+                    cells.append('')
+                elif info[0] > 1:
+                    cells.append(f'\\multirow{{{info[0]}}}{{*}}{{{escape_tex(info[1])}}}')
+                else:
+                    cells.append(escape_tex(info[1]))
+            lines.append(f'  {" & ".join(cells)} \\\\')
         
-        lines.append(f'    {" & ".join(cells)} \\\\')
+        lines.append('\\end{longtable}')
+    else:
+        # 短表格使用 resizebox 缩放到页宽
+        lines.append('\\begin{table}[htbp]')
+        lines.append('  \\centering')
+        lines.append('  \\small')
+        lines.append('  \\renewcommand{\\arraystretch}{1.4}')
+        lines.append('  \\resizebox{\\textwidth}{!}{%')
+        lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
+        lines.append('    \\toprule')
+        
+        header_cells = [f'\\textbf{{{escape_tex(str(cell))}}}' for cell in rows[0]]
+        lines.append(f'    {" & ".join(header_cells)} \\\\')
+        lines.append('    \\midrule')
+        
+        for r in range(1, len(rows)):
+            row = rows[r]
+            cells = []
+            for c in range(cols):
+                info = merge_info[r][c]
+                if info is None:
+                    cells.append('')
+                elif info[0] == 0:
+                    cells.append('')
+                elif info[0] > 1:
+                    cells.append(f'\\multirow{{{info[0]}}}{{*}}{{{escape_tex(info[1])}}}')
+                else:
+                    cells.append(escape_tex(info[1]))
+            lines.append(f'    {" & ".join(cells)} \\\\')
+        
+        lines.append('    \\bottomrule')
+        lines.append('  \\end{tabular}%')
+        lines.append('  }')
+        lines.append('\\end{table}')
     
-    lines.append('    \\bottomrule')
-    lines.append('  \\end{tabular}%')
-    lines.append('  }')
-    lines.append('\\end{table}')
     lines.append('')
     
     return '\n'.join(lines)
