@@ -156,10 +156,52 @@ def generate_tex(blocks):
                 lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
                 lines.append('    \\toprule')
                 
+                # 预处理：计算每列每行的合并信息
+                # merge_info[row][col] = (rowspan, content) 或 None 表示被合并
+                merge_info = [[None for _ in range(cols)] for _ in range(len(rows))]
+                
+                for c in range(cols):
+                    r = 0
+                    while r < len(rows):
+                        cell_val = str(rows[r][c]) if c < len(rows[r]) else ''
+                        if cell_val.strip() == '':
+                            # 空单元格，可能是被合并的
+                            r += 1
+                            continue
+                        # 计算向下合并的行数
+                        span = 1
+                        while r + span < len(rows):
+                            next_val = str(rows[r + span][c]) if c < len(rows[r + span]) else ''
+                            if next_val.strip() == '':
+                                span += 1
+                            else:
+                                break
+                        if span > 1:
+                            merge_info[r][c] = (span, cell_val)
+                            for k in range(1, span):
+                                merge_info[r + k][c] = (0, '')  # 标记为被合并
+                        else:
+                            merge_info[r][c] = (1, cell_val)
+                        r += span
+                
+                # 生成表格行
                 for r, row in enumerate(rows):
-                    cells = [escape_tex(str(cell)) for cell in row]
-                    while len(cells) < cols:
-                        cells.append('')
+                    cells = []
+                    skip_cols = set()
+                    
+                    for c in range(cols):
+                        info = merge_info[r][c]
+                        if info is None:
+                            cells.append('')
+                        elif info[0] == 0:
+                            # 被合并的单元格，跳过
+                            skip_cols.add(c)
+                            cells.append('')
+                        elif info[0] > 1:
+                            # 使用 multirow 合并
+                            cells.append(f'\\multirow{{{info[0]}}}{{*}}{{{escape_tex(info[1])}}}')
+                        else:
+                            cells.append(escape_tex(info[1]))
                     
                     if r == 0:
                         header_cells = [f'\\textbf{{{cell}}}' for cell in cells]
@@ -259,6 +301,7 @@ def generate_style_file():
 \RequirePackage{tabularx}
 \RequirePackage{array}
 \RequirePackage{ragged2e}
+\RequirePackage{multirow}
 
 \geometry{a4paper, margin=2.5cm}
 
