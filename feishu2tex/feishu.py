@@ -192,8 +192,9 @@ def parse_table(table_elem):
     if not rows:
         for tr in table_elem.findall('tr'):
             row = []
-            for cell in tr.findall(['th', 'td']):
-                row.append(get_text(cell))
+            for cell in tr:
+                if cell.tag in ('th', 'td'):
+                    row.append(get_text(cell))
             rows.append(row)
     
     return {'type': 'table', 'rows': rows}
