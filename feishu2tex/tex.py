@@ -213,6 +213,8 @@ def generate_style_file():
 \RequirePackage{multirow}
 \RequirePackage{longtable}
 \RequirePackage{tcolorbox}
+\RequirePackage{tabularray}
+\UseTblrLibrary{booktabs}
 
 \geometry{a4paper, margin=2.5cm}
 

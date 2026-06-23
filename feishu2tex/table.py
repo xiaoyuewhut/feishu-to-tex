@@ -1,11 +1,10 @@
 """表格生成模块"""
 
-import math
 from .utils import escape_tex
 
 
-def calc_col_widths(rows, cols):
-    """根据内容计算每列宽度比例（稳健宽度算法）"""
+def calc_col_weights(rows, cols):
+    """根据内容计算每列权重（用于 tabularray 的 X 列）"""
     def char_width(ch):
         if '\u4e00' <= ch <= '\u9fff':
             return 2  # 中文字符
@@ -27,10 +26,10 @@ def calc_col_widths(rows, cols):
             break
     
     if cols == 0:
-        return [1.0]
+        return [1]
     
     # 收集每列的宽度数据
-    col_widths = []
+    col_weights = []
     for c in range(cols):
         header_w = 0
         content_widths = []
@@ -41,7 +40,7 @@ def calc_col_widths(rows, cols):
             else:
                 content_widths.append(w)
         
-        # 用 max(表头宽度, 内容80分位宽度) 作为该列宽度
+        # 用 max(表头宽度, 内容80分位宽度) 作为该列权重
         if content_widths:
             content_widths.sort()
             idx = int(len(content_widths) * 0.8)
@@ -49,34 +48,13 @@ def calc_col_widths(rows, cols):
         else:
             p80 = 0
         
-        col_widths.append(max(header_w, p80, 1))
+        col_weights.append(max(header_w, p80, 1))
     
-    # 设置上下限
-    MIN_WIDTH = 0.07
-    MAX_WIDTH = 0.28
+    # 归一化为整数权重（最小1）
+    min_w = min(col_weights)
+    col_weights = [max(1, round(w / min_w)) for w in col_weights]
     
-    # 根据列数决定可用总宽度（预留 tabcolsep + 竖线空间）
-    if cols <= 4:
-        avail = 0.92
-    elif cols <= 8:
-        avail = 0.88
-    elif cols <= 12:
-        avail = 0.84
-    else:
-        avail = 0.80
-    
-    # 归一化到可用宽度
-    total = sum(col_widths)
-    col_widths = [(w / total) * avail for w in col_widths]
-    
-    # 应用上下限
-    col_widths = [max(MIN_WIDTH, min(MAX_WIDTH, w)) for w in col_widths]
-    
-    # 再次归一化
-    total = sum(col_widths)
-    col_widths = [(w / total) * avail for w in col_widths]
-    
-    return col_widths
+    return col_weights
 
 
 def calc_merge_info(rows, cols):
@@ -110,40 +88,38 @@ def calc_merge_info(rows, cols):
 
 
 def generate_table_tex(rows):
-    """生成表格的 LaTeX 代码"""
+    """生成表格的 LaTeX 代码（使用 tabularray 的 longtblr）"""
     if not rows:
         return ''
     
     lines = []
     cols = max(len(row) for row in rows)
     
-    # 计算列宽
-    col_widths = calc_col_widths(rows, cols)
-    col_spec = ''.join([f'p{{{w:.3f}\\textwidth}}' for w in col_widths])
+    # 计算列权重
+    col_weights = calc_col_weights(rows, cols)
+    colspec = ' '.join([f'X[{w},l]' for w in col_weights])
     
     # 计算合并信息
     merge_info = calc_merge_info(rows, cols)
     
-    # 使用 longtable，去掉竖线，局部设置 tabcolsep
+    # 使用 tabularray 的 longtblr
     lines.append('\\small')
-    lines.append('\\setlength{\\tabcolsep}{3pt}')
-    lines.append('\\renewcommand{\\arraystretch}{1.4}')
-    lines.append('\\begin{longtable}{' + col_spec + '}')
-    lines.append('  \\toprule')
-    header_cells = [f'\\textbf{{{escape_tex(str(cell))}}}' for cell in rows[0]]
-    lines.append(f'  {" & ".join(header_cells)} \\\\')
-    lines.append('  \\midrule')
-    lines.append('  \\endfirsthead')
-    lines.append('  \\toprule')
-    lines.append(f'  {" & ".join(header_cells)} \\\\')
-    lines.append('  \\midrule')
-    lines.append('  \\endhead')
-    lines.append('  \\midrule')
-    lines.append(f'  \\multicolumn{{{cols}}}{{r}}{{\\textit{{续下页}}}} \\\\')
-    lines.append('  \\endfoot')
-    lines.append('  \\bottomrule')
-    lines.append('  \\endlastfoot')
+    lines.append('\\begin{longtblr}[')
+    lines.append('  entry={none},')
+    lines.append('  label={none},')
+    lines.append(']{')
+    lines.append(f'  width=\\linewidth,')
+    lines.append(f'  colspec={{{colspec}}},')
+    lines.append('  rowhead=1,')
+    lines.append('  hlines,')
+    lines.append('  row{1}={font=\\bfseries},')
+    lines.append('}')
     
+    # 表头
+    header_cells = [escape_tex(str(cell)) for cell in rows[0]]
+    lines.append(f'  {" & ".join(header_cells)} \\\\')
+    
+    # 数据行
     for r in range(1, len(rows)):
         row = rows[r]
         cells = []
@@ -154,13 +130,12 @@ def generate_table_tex(rows):
             elif info[0] == 0:
                 cells.append('')
             elif info[0] > 1:
-                width = col_widths[c]
-                cells.append(f'\\multirow{{{info[0]}}}{{{width:.3f}\\textwidth}}{{{escape_tex(info[1])}}}')
+                cells.append(f'\\SetCell[r={info[0]}]{{l}} {escape_tex(info[1])}')
             else:
                 cells.append(escape_tex(info[1]))
         lines.append(f'  {" & ".join(cells)} \\\\')
     
-    lines.append('\\end{longtable}')
+    lines.append('\\end{longtblr}')
     lines.append('')
     
     return '\n'.join(lines)
