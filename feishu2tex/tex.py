@@ -214,6 +214,7 @@ def generate_style_file():
 \RequirePackage{longtable}
 \RequirePackage{tcolorbox}
 \RequirePackage{tabularray}
+\RequirePackage{needspace}
 \UseTblrLibrary{booktabs}
 
 \geometry{a4paper, margin=2.5cm}
