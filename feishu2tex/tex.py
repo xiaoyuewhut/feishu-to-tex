@@ -110,39 +110,37 @@ def generate_tex(blocks):
             if rows:
                 cols = max(len(row) for row in rows)
                 
-                # 计算每列最大字符数，用于判断是否需要固定宽度
+                # 计算每列最大字符数
                 col_max_chars = [0] * cols
                 for row in rows:
                     for i, cell in enumerate(row):
                         if i < cols:
                             col_max_chars[i] = max(col_max_chars[i], len(str(cell)))
                 
-                total_chars = sum(col_max_chars)
-                
                 lines.append('\\begin{table}[htbp]')
                 lines.append('  \\centering')
-                lines.append('  \\small')  # 使用较小字体
+                lines.append('  \\small')
+                lines.append('  \\renewcommand{\\arraystretch}{1.2}')  # 增加行高
                 
-                # 根据表格宽度选择合适的格式
-                if total_chars > 80:
-                    # 宽表格使用 tabularx 自适应宽度
-                    col_spec = '|'.join(['Y'] * cols)
-                    lines.append(f'  \\begin{{tabularx}}{{\\textwidth}}{{|{col_spec}|}}')
-                else:
-                    # 窄表格使用居中的固定宽度
-                    col_spec = '|'.join(['c'] * cols)
-                    lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
+                # 统一使用 tabularx 自适应页宽
+                # 根据每列内容长度分配 X 或 Y 类型
+                col_specs = []
+                for max_chars in col_max_chars:
+                    if max_chars > 20:
+                        col_specs.append('X')  # 长文本左对齐自动换行
+                    else:
+                        col_specs.append('Y')  # 短文本居中
+                col_spec = ''.join(col_specs)
                 
+                lines.append(f'  \\begin{{tabularx}}{{\\textwidth}}{{{col_spec}}}')
                 lines.append('    \\toprule')
                 
                 for r, row in enumerate(rows):
                     cells = [escape_tex(str(cell)) for cell in row]
-                    # 补齐空单元格
                     while len(cells) < cols:
                         cells.append('')
                     
                     if r == 0:
-                        # 表头加粗居中
                         header_cells = [f'\\textbf{{{cell}}}' for cell in cells]
                         lines.append(f'    {" & ".join(header_cells)} \\\\')
                         lines.append('    \\midrule')
@@ -150,12 +148,7 @@ def generate_tex(blocks):
                         lines.append(f'    {" & ".join(cells)} \\\\')
                 
                 lines.append('    \\bottomrule')
-                
-                if total_chars > 80:
-                    lines.append('  \\end{tabularx}')
-                else:
-                    lines.append('  \\end{tabular}')
-                
+                lines.append('  \\end{tabularx}')
                 lines.append('\\end{table}')
                 lines.append('')
     
