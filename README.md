@@ -1,33 +1,84 @@
-# Feishu to TeX - L0 骨架验证
+# Feishu to TeX
 
-飞书文档转 LaTeX 项目的 Chrome 插件原型。
+飞书文档转 LaTeX 项目的 CLI 工具。
 
-## 安装测试
+## 依赖
 
-1. 打开 Chrome，访问 `chrome://extensions/`
-2. 开启「开发者模式」
-3. 点击「加载已解压的扩展程序」
-4. 选择 `print` 目录（即仓库根目录）
+- Python 3.7+
+- [lark-cli](https://github.com/larksuite/lark-cli) - 飞书 CLI 工具
+- 已登录飞书账号: `lark-cli auth login`
+
+## 安装
+
+```bash
+# 安装 lark-cli (如果还没有)
+brew install larksuite/tap/lark-cli
+
+# 登录飞书
+lark-cli auth login
+```
 
 ## 使用
 
-1. 打开任意飞书文档 (`*.feishu.cn/docx/*`)
-2. 点击插件图标
-3. 等待检测完成，点击「导出 .tex 文件」
+### CLI 工具 (推荐)
 
-## L0 能力
+```bash
+# 基本用法
+python3 convert.py https://xxx.feishu.cn/docx/Z1Fj...tnAc
 
-- 检测飞书文档页面
-- 提取标题、段落、粗体、斜体、链接
-- 提取有序/无序列表
-- 提取代码块（保留语言标识）
-- 生成可编译的 .tex 文件（ctexart 文档类）
-- 通过 Chrome 下载 API 导出
+# 指定输出目录
+python3 convert.py https://xxx.feishu.cn/wiki/xxx ./output
+```
 
-## 已知限制（L1/L2 后续解决）
+输出:
+- 生成的 LaTeX 项目目录
+- `.zip` 压缩包 (可直接上传 Overleaf)
 
-- 图片仅输出占位注释，不实际下载
-- 不处理复杂表格
-- 不处理公式
-- DOM 解析依赖飞书页面结构，可能不稳定
-- 未接入飞书开放 API
+### Chrome 插件 (旧版, 不推荐)
+
+Chrome 插件版本使用 DOM 解析，格式支持有限，建议使用 CLI 工具。
+
+## 转换能力
+
+- 标题 (H1-H6)
+- 段落、粗体、斜体、链接
+- 有序/无序列表、待办事项
+- 代码块 (保留语言标识)
+- 表格
+- 引用、高亮框 (callout)
+- 图片 (自动下载)
+- 数学公式 (行内)
+
+## 输出结构
+
+```
+doc-title/
+├── main.tex              # 主文件
+├── sections/             # 章节文件
+│   ├── 01-intro.tex
+│   └── 02-content.tex
+├── assets/
+│   └── images/           # 下载的图片
+├── styles/
+│   └── feishu.sty        # 样式文件
+├── latexmkrc             # latexmk 配置
+├── metadata.json         # 文档元数据
+└── conversion-report.json # 转换报告
+```
+
+## 编译
+
+上传 `.zip` 到 [Overleaf](https://overleaf.com)，选择 XeLaTeX 编译器即可。
+
+本地编译:
+```bash
+cd doc-title
+latexmk -xelatex main.tex
+```
+
+## 已知限制
+
+- 需要飞书账号有文档访问权限
+- 嵌入的电子表格/多维表格不会转换
+- 画板/白板不会转换
+- 部分复杂排版可能需要手动调整
