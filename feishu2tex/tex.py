@@ -84,13 +84,13 @@ def generate_tex(blocks):
         
         elif block_type == 'quote':
             lines.append('\\begin{quote}')
-            lines.append(f'  {block["content"]}')
+            lines.append(f'  {escape_tex(block["content"])}')
             lines.append('\\end{quote}')
             lines.append('')
         
         elif block_type == 'callout':
             lines.append('\\begin{quote}')
-            lines.append(f'  \\textbf{{注意:}} {block["content"]}')
+            lines.append(f'  \\textbf{{注意:}} {escape_tex(block["content"])}')
             lines.append('\\end{quote}')
             lines.append('')
         
