@@ -241,6 +241,11 @@ def escape_tex(text):
         return ''
     # 先处理反斜杠
     text = text.replace('\\', '\\textbackslash{}')
+    # 处理数学符号
+    text = text.replace('≤', '$\\leq$')
+    text = text.replace('≥', '$\\geq$')
+    text = text.replace('＜', '$<$')
+    text = text.replace('＞', '$>$')
     # 处理特殊字符
     special_chars = {
         '&': '\\&',
@@ -298,14 +303,25 @@ def generate_tex(blocks):
     for i, block in enumerate(blocks):
         block_type = block.get('type')
         
-        # 关闭列表
-        if in_list and block_type not in ['ordered_list', 'unordered_list', 'checkbox']:
-            if in_list == 'ordered':
-                lines.append('\\end{enumerate}')
-            else:
-                lines.append('\\end{itemize}')
-            lines.append('')
-            in_list = None
+        # 关闭列表（当切换到不同类型或非列表类型时）
+        if in_list:
+            should_close = False
+            if block_type == 'ordered_list' and in_list != 'ordered':
+                should_close = True
+            elif block_type == 'unordered_list' and in_list != 'unordered':
+                should_close = True
+            elif block_type == 'checkbox' and in_list != 'unchecked':
+                should_close = True
+            elif block_type not in ['ordered_list', 'unordered_list', 'checkbox']:
+                should_close = True
+            
+            if should_close:
+                if in_list == 'ordered':
+                    lines.append('\\end{enumerate}')
+                else:
+                    lines.append('\\end{itemize}')
+                lines.append('')
+                in_list = None
         
         if block_type == 'title':
             # 标题在 main.tex 中处理
