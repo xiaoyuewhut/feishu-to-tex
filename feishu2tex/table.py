@@ -5,33 +5,42 @@ from .utils import escape_tex
 
 def calc_col_widths(rows, cols):
     """根据内容计算每列宽度比例"""
-    col_total_chars = [0] * cols
-    col_max_chars = [0] * cols
+    # 使用更精确的宽度计算：中文字符算2个宽度，其他算1个
+    def char_width(ch):
+        if '\u4e00' <= ch <= '\u9fff':
+            return 2  # 中文字符
+        return 1
+    
+    def text_width(text):
+        return sum(char_width(ch) for ch in str(text))
+    
+    col_total_width = [0] * cols
+    col_max_width = [0] * cols
     col_counts = [0] * cols
     
     for row in rows:
         for i, cell in enumerate(row):
             if i < cols:
-                cell_len = len(str(cell))
-                col_total_chars[i] += cell_len
-                col_max_chars[i] = max(col_max_chars[i], cell_len)
-                if cell_len > 0:
+                w = text_width(cell)
+                col_total_width[i] += w
+                col_max_width[i] = max(col_max_width[i], w)
+                if w > 0:
                     col_counts[i] += 1
     
-    # 计算每列的平均字符数
-    col_avg_chars = []
+    # 计算每列的平均宽度
+    col_avg_width = []
     for i in range(cols):
         if col_counts[i] > 0:
-            col_avg_chars.append(col_total_chars[i] / col_counts[i])
+            col_avg_width.append(col_total_width[i] / col_counts[i])
         else:
-            col_avg_chars.append(1)
+            col_avg_width.append(2)  # 默认最小宽度
     
-    # 根据平均字符数计算列宽比例
-    total_avg = sum(col_avg_chars)
-    col_widths = [(avg / total_avg) * 0.92 for avg in col_avg_chars]
+    # 根据平均宽度计算列宽比例
+    total_avg = sum(col_avg_width)
+    col_widths = [(avg / total_avg) * 0.92 for avg in col_avg_width]
     
-    # 确保最小列宽
-    min_width = 0.10
+    # 确保最小列宽（至少占总宽度的8%）
+    min_width = 0.08
     col_widths = [max(w, min_width) for w in col_widths]
     
     # 归一化
