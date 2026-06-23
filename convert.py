@@ -222,6 +222,19 @@ def get_rich_text(elem):
     return ''.join(parts)
 
 
+def strip_heading_number(text):
+    """去掉标题开头的数字序号，如 '1.1 xxx' -> 'xxx', '2.' -> '2'"""
+    # 匹配开头的数字序号: 1. / 1.1 / 1.1.1 / 1.1.1.1 等
+    m = re.match(r'^([\d]+(\.[\d]+)*\.?)\s*', text)
+    if m:
+        rest = text[m.end():].strip()
+        # 如果去掉序号后为空，保留数字部分（去掉末尾的点）
+        if not rest:
+            return m.group(1).rstrip('.')
+        return rest
+    return text
+
+
 def escape_tex(text):
     """转义 TeX 特殊字符"""
     if not text:
@@ -259,13 +272,11 @@ def sanitize_filename(name):
 
 
 def sanitize_ascii(name):
-    """转为 ASCII 安全文件夹名"""
+    """清理文件名，保留中文和ASCII字符"""
     if not name:
         return ''
-    # 只保留 ASCII 可打印字符
-    name = ''.join(c for c in name if 32 <= ord(c) <= 126)
-    name = re.sub(r'[<>:"/\\|?*]', '_', name)
-    name = re.sub(r'\s+', '-', name)
+    # 保留中文、字母、数字、点、连字符
+    name = re.sub(r'[^\w.\-\u4e00-\u9fff]', '-', name)
     name = re.sub(r'-+', '-', name)
     name = name.strip('-')
     return name[:80]
@@ -304,8 +315,10 @@ def generate_tex(blocks):
             level = block.get('level', 1)
             cmd = ['section', 'subsection', 'subsubsection', 
                    'paragraph', 'subparagraph', 'subparagraph'][min(level - 1, 5)]
-            lines.append(f'\\{cmd}{{{block["content"]}}}')
-            lines.append('')
+            heading_text = strip_heading_number(block["content"])
+            if heading_text:
+                lines.append(f'\\{cmd}{{{heading_text}}}')
+                lines.append('')
         
         elif block_type == 'paragraph':
             lines.append(block['content'])
@@ -444,7 +457,9 @@ def generate_main_tex(title, sections):
     
     for i, section in enumerate(sections):
         num = str(i + 1).zfill(2)
-        name = sanitize_ascii(section.get('heading') or 'content')
+        heading = section.get('heading')
+        clean_heading = strip_heading_number(heading) if heading else None
+        name = sanitize_ascii(clean_heading or 'content')
         lines.append(f'\\input{{sections/{num}-{name}}}')
         lines.append('')
     
@@ -575,7 +590,10 @@ def create_project(blocks, title, doc_id, output_dir):
     # 生成各章节
     for i, section in enumerate(sections):
         num = str(i + 1).zfill(2)
-        name = sanitize_ascii(section.get('heading') or 'content')
+        heading = section.get('heading')
+        # 去掉标题中的序号，用于文件名
+        clean_heading = strip_heading_number(heading) if heading else None
+        name = sanitize_ascii(clean_heading or 'content')
         filename = f'{num}-{name}.tex'
         
         section_tex = generate_tex(section.get('blocks', []))
@@ -613,7 +631,7 @@ def create_project(blocks, title, doc_id, output_dir):
         'downloaded_images': image_idx - len(warnings),
         'sections': [
             {
-                'file': f'sections/{str(i + 1).zfill(2)}-{sanitize_ascii(section.get("heading") or "content")}.tex',
+                'file': f'sections/{str(i + 1).zfill(2)}-{sanitize_ascii(strip_heading_number(section.get("heading")) if section.get("heading") else "content")}.tex',
                 'blocks': len(section.get('blocks', []))
             }
             for i, section in enumerate(sections)
