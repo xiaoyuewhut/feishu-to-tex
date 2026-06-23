@@ -153,7 +153,9 @@ def generate_table_tex(rows):
             elif info[0] == 0:
                 cells.append('')
             elif info[0] > 1:
-                cells.append(f'\\multirow{{{info[0]}}}{{*}}{{{escape_tex(info[1])}}}')
+                # 使用 p{width} 实现自动换行
+                width = col_widths[c]
+                cells.append(f'\\multirow{{{info[0]}}}{{{width:.3f}\\textwidth}}{{{escape_tex(info[1])}}}')
             else:
                 cells.append(escape_tex(info[1]))
         lines.append(f'  {" & ".join(cells)} \\\\')
