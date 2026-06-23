@@ -198,6 +198,7 @@ def generate_style_file():
 \RequirePackage{array}
 \RequirePackage{ragged2e}
 \RequirePackage{multirow}
+\RequirePackage{longtable}
 
 \geometry{a4paper, margin=2.5cm}
 

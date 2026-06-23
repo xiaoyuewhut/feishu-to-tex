@@ -85,20 +85,45 @@ def generate_table_tex(rows):
     # 计算合并信息
     merge_info = calc_merge_info(rows, cols)
     
-    lines.append('\\begin{table}[htbp]')
-    lines.append('  \\centering')
-    lines.append('  \\small')
-    lines.append('  \\renewcommand{\\arraystretch}{1.4}')
+    # 判断是否使用 longtable（超过 20 行）
+    use_longtable = len(rows) > 20
     
     # 使用 M{} 类型实现垂直居中 + 允许换行 + 居中对齐
     col_specs = [f'M{{{w:.3f}\\textwidth}}' for w in col_widths]
     col_spec = ''.join(col_specs)
     
-    lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
-    lines.append('    \\toprule')
+    if use_longtable:
+        lines.append('\\begin{longtable}{' + col_spec + '}')
+        lines.append('  \\toprule')
+        # 表头
+        header_cells = [f'\\textbf{{{escape_tex(str(cell))}}}' for cell in rows[0]]
+        lines.append(f'  {" & ".join(header_cells)} \\\\')
+        lines.append('  \\midrule')
+        lines.append('  \\endfirsthead')
+        # 续表表头
+        lines.append('  \\toprule')
+        lines.append(f'  {" & ".join(header_cells)} \\\\')
+        lines.append('  \\midrule')
+        lines.append('  \\endhead')
+        # 续表表尾
+        lines.append('  \\midrule')
+        lines.append('  \\multicolumn{' + str(cols) + '}{r}{\\textit{续下页}} \\\\')
+        lines.append('  \\endfoot')
+        # 最后一页表尾
+        lines.append('  \\bottomrule')
+        lines.append('  \\endlastfoot')
+    else:
+        lines.append('\\begin{table}[htbp]')
+        lines.append('  \\centering')
+        lines.append('  \\small')
+        lines.append('  \\renewcommand{\\arraystretch}{1.4}')
+        lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
+        lines.append('    \\toprule')
     
     # 生成表格行
-    for r, row in enumerate(rows):
+    start_row = 1 if use_longtable else 1
+    for r in range(start_row, len(rows)):
+        row = rows[r]
         cells = []
         
         for c in range(cols):
@@ -119,11 +144,16 @@ def generate_table_tex(rows):
             lines.append(f'    {" & ".join(header_cells)} \\\\')
             lines.append('    \\midrule')
         else:
-            lines.append(f'    {" & ".join(cells)} \\\\')
+            indent = '  ' if use_longtable else '    '
+            lines.append(f'{indent}{" & ".join(cells)} \\\\')
     
-    lines.append('    \\bottomrule')
-    lines.append('  \\end{tabular}')
-    lines.append('\\end{table}')
+    if use_longtable:
+        lines.append('\\end{longtable}')
+    else:
+        lines.append('    \\bottomrule')
+        lines.append('  \\end{tabular}')
+        lines.append('\\end{table}')
+    
     lines.append('')
     
     return '\n'.join(lines)
