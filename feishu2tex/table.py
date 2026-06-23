@@ -58,30 +58,58 @@ def calc_col_weights(rows, cols):
 
 
 def calc_merge_info(rows, cols):
-    """计算合并单元格信息"""
+    """计算合并单元格信息（指标-权重成对合并）"""
     merge_info = [[None for _ in range(cols)] for _ in range(len(rows))]
     
+    def cell_val(r, c):
+        if c >= len(rows[r]):
+            return ''
+        return str(rows[r][c]).strip()
+    
+    # 先计算每列的合并范围
     for c in range(cols):
         r = 0
         while r < len(rows):
-            cell_val = str(rows[r][c]) if c < len(rows[r]) else ''
-            if cell_val.strip() == '':
+            val = cell_val(r, c)
+            if val == '':
                 r += 1
                 continue
+            
             # 计算向下合并的行数
             span = 1
-            while r + span < len(rows):
-                next_val = str(rows[r + span][c]) if c < len(rows[r + span]) else ''
-                if next_val.strip() == '':
-                    span += 1
-                else:
-                    break
+            
+            # 权重列（奇数列）只能跟随对应指标列的合并范围
+            if c % 2 == 1:
+                indicator_col = c - 1  # 对应的指标列
+                # 找到指标列在当前行的合并范围
+                indicator_span = 1
+                while r + indicator_span < len(rows):
+                    if cell_val(r + indicator_span, indicator_col) == '':
+                        indicator_span += 1
+                    else:
+                        break
+                
+                # 权重列的合并范围不能超过指标列
+                while r + span < len(rows) and span < indicator_span:
+                    if cell_val(r + span, c) == '':
+                        span += 1
+                    else:
+                        break
+            else:
+                # 指标列（偶数列）正常合并
+                while r + span < len(rows):
+                    if cell_val(r + span, c) == '':
+                        span += 1
+                    else:
+                        break
+            
             if span > 1:
-                merge_info[r][c] = (span, cell_val)
+                merge_info[r][c] = (span, cell_val(r, c))
                 for k in range(1, span):
                     merge_info[r + k][c] = (0, '')
             else:
-                merge_info[r][c] = (1, cell_val)
+                merge_info[r][c] = (1, val)
+            
             r += span
     
     return merge_info
