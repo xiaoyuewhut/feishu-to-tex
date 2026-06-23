@@ -80,6 +80,34 @@ def calc_merge_info(rows, cols):
     return merge_info
 
 
+def calc_col_widths_for_longtable(rows, cols):
+    """为 longtable 计算每列宽度比例（基于内容）"""
+    def char_width(ch):
+        if '\u4e00' <= ch <= '\u9fff':
+            return 2
+        return 1
+    
+    def text_width(text):
+        return sum(char_width(ch) for ch in str(text))
+    
+    col_max_width = [0] * cols
+    
+    for row in rows:
+        for i, cell in enumerate(row):
+            if i < cols:
+                w = text_width(cell)
+                col_max_width[i] = max(col_max_width[i], w)
+    
+    # 确保最小宽度
+    col_max_width = [max(w, 4) for w in col_max_width]
+    
+    # 归一化到 \textwidth
+    total = sum(col_max_width)
+    col_widths = [(w / total) * 0.95 for w in col_max_width]
+    
+    return col_widths
+
+
 def generate_table_tex(rows):
     """生成表格的 LaTeX 代码"""
     if not rows:
@@ -88,9 +116,6 @@ def generate_table_tex(rows):
     lines = []
     cols = max(len(row) for row in rows)
     
-    # 使用 l 列类型，宽度由内容决定
-    col_spec = '|' + '|'.join(['l'] * cols) + '|'
-    
     # 计算合并信息
     merge_info = calc_merge_info(rows, cols)
     
@@ -98,7 +123,10 @@ def generate_table_tex(rows):
     use_longtable = len(rows) > 20
     
     if use_longtable:
-        # 长表格使用 longtable，统一字号
+        # 长表格使用 longtable + p{} 列实现换行
+        col_widths = calc_col_widths_for_longtable(rows, cols)
+        col_spec = '|' + '|'.join([f'p{{{w:.3f}\\textwidth}}' for w in col_widths]) + '|'
+        
         lines.append('\\small')
         lines.append('\\renewcommand{\\arraystretch}{1.4}')
         lines.append('\\begin{longtable}{' + col_spec + '}')
@@ -135,6 +163,8 @@ def generate_table_tex(rows):
         lines.append('\\end{longtable}')
     else:
         # 短表格使用 resizebox 缩放到页宽
+        col_spec = '|' + '|'.join(['l'] * cols) + '|'
+        
         lines.append('\\begin{table}[htbp]')
         lines.append('  \\centering')
         lines.append('  \\small')
