@@ -91,8 +91,8 @@ def generate_table_tex(rows):
     # 判断是否使用 longtable（超过 20 行）
     use_longtable = len(rows) > 20
     
-    # 生成列规格：使用 X 类型自动分配宽度
-    col_spec = '|' + '|'.join(['X'] * cols) + '|'
+    # 使用 l 列类型，宽度由内容决定
+    col_spec = '|' + '|'.join(['l'] * cols) + '|'
     
     if use_longtable:
         lines.append('\\begin{longtable}{' + col_spec + '}')
@@ -119,7 +119,7 @@ def generate_table_tex(rows):
         lines.append('  \\centering')
         lines.append('  \\small')
         lines.append('  \\renewcommand{\\arraystretch}{1.4}')
-        lines.append(f'  \\begin{{tabularx}}{{\\textwidth}}{{{col_spec}}}')
+        lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
         lines.append('    \\toprule')
     
     # 计算合并信息
@@ -149,7 +149,7 @@ def generate_table_tex(rows):
         lines.append('\\end{longtable}')
     else:
         lines.append('    \\bottomrule')
-        lines.append('  \\end{tabularx}')
+        lines.append('  \\end{tabular}')
         lines.append('\\end{table}')
     
     lines.append('')
