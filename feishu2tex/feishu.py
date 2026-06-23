@@ -32,6 +32,39 @@ def extract_doc_info(response):
     return doc_id, content
 
 
+def fetch_sheet_data(token, sheet_id):
+    """获取电子表格数据"""
+    cmd = [
+        'lark-cli', 'sheets', '+cells-get',
+        '--spreadsheet-token', token,
+        '--sheet-id', sheet_id,
+        '--range', 'A1:Z100',
+        '--format', 'json'
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        return None
+    
+    data = json.loads(result.stdout)
+    if not data.get('ok'):
+        return None
+    
+    # 提取单元格值
+    ranges = data.get('data', {}).get('ranges', [])
+    if not ranges:
+        return None
+    
+    cells = ranges[0].get('cells', [])
+    rows = []
+    for row in cells:
+        row_values = [cell.get('value', '') for cell in row]
+        # 过滤全空行
+        if any(str(v).strip() for v in row_values):
+            rows.append(row_values)
+    
+    return rows if rows else None
+
+
 def parse_xml_content(xml_content):
     """解析 XML 内容为块列表"""
     blocks = []
@@ -115,6 +148,11 @@ def parse_element(elem):
     
     if tag == 'table':
         return parse_table(elem)
+    
+    if tag == 'sheet':
+        sheet_id = elem.get('sheet-id', '')
+        token = elem.get('token', '')
+        return {'type': 'sheet', 'sheet_id': sheet_id, 'token': token}
     
     if tag == 'checkbox':
         done = elem.get('done', 'false') == 'true'

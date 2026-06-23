@@ -8,6 +8,7 @@ from .utils import (
     sanitize_filename, sanitize_ascii, to_folder_name,
     strip_heading_number, download_image, guess_image_ext
 )
+from .feishu import fetch_sheet_data
 from .tex import (
     generate_tex, generate_main_tex, generate_style_file,
     generate_latexmkrc, split_sections
@@ -43,6 +44,29 @@ def create_project(blocks, title, doc_id, output_dir):
             else:
                 warnings.append(f'图片下载失败: {block["src"]}')
                 image_map[block['src']] = None
+    
+    # 获取电子表格数据
+    sheet_cache = {}
+    for block in blocks:
+        if block.get('type') == 'sheet':
+            token = block.get('token')
+            sheet_id = block.get('sheet_id')
+            cache_key = f'{token}:{sheet_id}'
+            
+            if cache_key not in sheet_cache:
+                print(f'  获取表格数据: {sheet_id}...')
+                sheet_data = fetch_sheet_data(token, sheet_id)
+                sheet_cache[cache_key] = sheet_data
+            else:
+                sheet_data = sheet_cache[cache_key]
+            
+            if sheet_data:
+                block['rows'] = sheet_data
+                block['type'] = 'table'
+            else:
+                warnings.append(f'表格获取失败: {sheet_id}')
+                block['type'] = 'paragraph'
+                block['content'] = f'[表格: {sheet_id}]'
     
     # 替换图片引用
     for block in blocks:
