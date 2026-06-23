@@ -2,7 +2,7 @@
 
 ## 项目
 
-飞书文档转 LaTeX CLI 工具。用法: `python3 convert.py <飞书文档URL> [输出目录]`
+飞书文档转 LaTeX CLI 工具。
 
 ## 核心依赖
 
@@ -13,41 +13,40 @@
 ## 结构
 
 ```
-convert.py          # 主脚本，解析飞书 XML 并生成 LaTeX 项目
-test/               # 测试输出，每个文档一个子文件夹
-README.md           # 用户文档
+feishu2tex/          # 主包
+├── __init__.py      # 包初始化
+├── __main__.py      # CLI 入口 (python3 -m feishu2tex)
+├── feishu.py        # 飞书 API 调用和 XML 解析
+├── tex.py           # LaTeX 代码生成
+├── project.py       # 项目文件夹创建
+└── utils.py         # 工具函数 (转义、清理等)
+convert.py           # 快捷入口脚本
+test/                # 测试输出 (gitignore)
 ```
-
-## 关键约定
-
-- 调用 `lark-cli docs +fetch --api-version v2 --doc <URL> --doc-format xml --detail simple --format json` 获取文档
-- 解析 XML (标准 HTML 子集: p, h1-h6, ul, ol, table, pre, blockquote, img 等)
-- 按 H1/H2 分章节，生成 `sections/01-xxx.tex`
-- 图片自动下载到 `assets/images/`
-- 样式文件在 `styles/feishu.sty`
 
 ## 常用命令
 
 ```bash
-# 测试转换
+# 转换文档
 python3 convert.py <URL> ./test
+python3 -m feishu2tex <URL> ./test
 
-# 检查语法
+# 语法检查
 python3 -m py_compile convert.py
+python3 -m py_compile feishu2tex/__main__.py
 ```
 
-## XML 格式要点
+## 关键约定
 
-- `<title>` 是文档标题
-- `<pre lang="xxx"><code>...</code></pre>` 是代码块
-- `<img href="..."/>` 是图片，需要下载
-- `<latex>...</latex>` 是行内公式
-- `<callout>` 是高亮框
-- `<checkbox done="true|false">` 是待办项
+- lark-cli 命令: `lark-cli docs +fetch --api-version v2 --doc <URL> --doc-format xml --detail simple --format json`
+- XML 标签: `<title>`, `<h1>-<h6>`, `<ul>/<ol>/<li>`, `<pre>/<code>`, `<img>`, `<table>`, `<callout>`, `<checkbox>`
+- 按 H1/H2 分章节
+- 标题序号自动去掉 (如 "1.1 跟车能力" → "跟车能力")
+- 数学符号转义: `≤` → `$\leq$`, `≥` → `$\geq$`
 
 ## 注意事项
 
-- lark-cli 输出的 XML 中 `&` 已转义为 `&amp;`，不要重复转义
-- 表格可能有 `<thead>` / `<tbody>`，也可能直接是 `<tr>`
-- 图片 URL 可能是飞书内部 URL，需要能访问
-- 测试目录 `test/` 下的文件不提交到 git
+- 切换列表类型时必须关闭前一个列表 (itemize ↔ enumerate)
+- 图片 URL 可能是飞书内部 URL，需要网络访问
+- 测试目录 `test/` 不提交到 git
+- 文件名保留中文字符

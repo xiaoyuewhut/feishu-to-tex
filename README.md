@@ -21,16 +21,31 @@ lark-cli auth login
 ## 使用
 
 ```bash
-# 基本用法 - 输出到当前目录
-python3 convert.py https://xxx.feishu.cn/docx/Z1Fj...tnAc
+# 方式1: 使用 convert.py 脚本
+python3 convert.py <飞书文档URL> [输出目录]
 
-# 指定输出目录
-python3 convert.py https://xxx.feishu.cn/wiki/xxx ./test
+# 方式2: 使用模块
+python3 -m feishu2tex <飞书文档URL> [输出目录]
+
+# 示例
+python3 convert.py https://xxx.feishu.cn/docx/Z1Fj...tnAc ./test
+```
+
+## 项目结构
+
+```
+feishu2tex/
+├── __init__.py     # 包初始化
+├── __main__.py     # CLI 入口
+├── feishu.py       # 飞书文档获取与解析
+├── tex.py          # LaTeX 生成
+├── project.py      # 项目生成
+└── utils.py        # 工具函数
 ```
 
 ## 转换能力
 
-- 标题 (H1-H6)
+- 标题 (H1-H6)，自动去掉数字序号
 - 段落、粗体、斜体、链接
 - 有序/无序列表、待办事项
 - 代码块 (保留语言标识)
@@ -38,6 +53,7 @@ python3 convert.py https://xxx.feishu.cn/wiki/xxx ./test
 - 引用、高亮框 (callout)
 - 图片 (自动下载)
 - 数学公式 (行内)
+- 特殊符号 (≤, ≥ 等)
 
 ## 输出结构
 
@@ -63,7 +79,8 @@ doc-title/
 本地编译:
 ```bash
 cd doc-title
-latexmk -xelatex main.tex
+xelatex main.tex
+xelatex main.tex  # 运行两次生成目录
 ```
 
 ## 测试

@@ -1,0 +1,240 @@
+"""LaTeX 生成"""
+
+import re
+
+from .utils import escape_tex, strip_heading_number, sanitize_ascii
+
+
+def generate_tex(blocks):
+    """将块列表转换为 TeX 内容"""
+    lines = []
+    in_list = None
+    
+    for i, block in enumerate(blocks):
+        block_type = block.get('type')
+        
+        # 关闭列表（当切换到不同类型或非列表类型时）
+        if in_list:
+            should_close = False
+            if block_type == 'ordered_list' and in_list != 'ordered':
+                should_close = True
+            elif block_type == 'unordered_list' and in_list != 'unordered':
+                should_close = True
+            elif block_type == 'checkbox' and in_list != 'unchecked':
+                should_close = True
+            elif block_type not in ['ordered_list', 'unordered_list', 'checkbox']:
+                should_close = True
+            
+            if should_close:
+                if in_list == 'ordered':
+                    lines.append('\\end{enumerate}')
+                else:
+                    lines.append('\\end{itemize}')
+                lines.append('')
+                in_list = None
+        
+        if block_type == 'title':
+            # 标题在 main.tex 中处理
+            continue
+        
+        elif block_type == 'heading':
+            level = block.get('level', 1)
+            cmd = ['section', 'subsection', 'subsubsection', 
+                   'paragraph', 'subparagraph', 'subparagraph'][min(level - 1, 5)]
+            heading_text = strip_heading_number(block["content"])
+            if heading_text:
+                lines.append(f'\\{cmd}{{{heading_text}}}')
+                lines.append('')
+        
+        elif block_type == 'paragraph':
+            lines.append(block['content'])
+            lines.append('')
+        
+        elif block_type == 'ordered_list':
+            if in_list != 'ordered':
+                lines.append('\\begin{enumerate}')
+                in_list = 'ordered'
+            for item in block.get('items', []):
+                lines.append(f'  \\item {item}')
+        
+        elif block_type == 'unordered_list':
+            if in_list != 'unordered':
+                lines.append('\\begin{itemize}')
+                in_list = 'unordered'
+            for item in block.get('items', []):
+                lines.append(f'  \\item {item}')
+        
+        elif block_type == 'checkbox':
+            if in_list != 'unchecked':
+                lines.append('\\begin{itemize}')
+                in_list = 'unchecked'
+            marker = '$\\boxtimes$' if block.get('done') else '$\\square$'
+            lines.append(f'  \\item[{marker}] {block["content"]}')
+        
+        elif block_type == 'code_block':
+            lang = block.get('language', '')
+            caption = block.get('caption', '')
+            if caption:
+                lines.append(f'\\begin{{lstlisting}}[language={lang}, caption={{{caption}}}]')
+            else:
+                lines.append(f'\\begin{{lstlisting}}[language={lang}]')
+            lines.append(block['content'])
+            lines.append('\\end{lstlisting}')
+            lines.append('')
+        
+        elif block_type == 'quote':
+            lines.append('\\begin{quote}')
+            lines.append(f'  {block["content"]}')
+            lines.append('\\end{quote}')
+            lines.append('')
+        
+        elif block_type == 'callout':
+            lines.append('\\begin{quote}')
+            lines.append(f'  \\textbf{{注意:}} {block["content"]}')
+            lines.append('\\end{quote}')
+            lines.append('')
+        
+        elif block_type == 'divider':
+            lines.append('\\noindent\\rule{\\textwidth}{0.4pt}')
+            lines.append('')
+        
+        elif block_type == 'image':
+            src = block.get('src', '')
+            alt = block.get('alt', '')
+            if src:
+                lines.append(f'% [图片: {alt or src}]')
+            lines.append('')
+        
+        elif block_type == 'table':
+            rows = block.get('rows', [])
+            if rows:
+                cols = max(len(row) for row in rows)
+                lines.append('\\begin{table}[htbp]')
+                lines.append('  \\centering')
+                lines.append(f'  \\begin{{tabular}}{{{"l" * cols}}}')
+                lines.append('    \\hline')
+                for r, row in enumerate(rows):
+                    cells = [escape_tex(cell) for cell in row]
+                    # 补齐空单元格
+                    while len(cells) < cols:
+                        cells.append('')
+                    lines.append(f'    {" & ".join(cells)} \\\\')
+                    if r == 0:
+                        lines.append('    \\hline')
+                lines.append('    \\hline')
+                lines.append('  \\end{tabular}')
+                lines.append('\\end{table}')
+                lines.append('')
+    
+    # 关闭最后的列表
+    if in_list:
+        if in_list == 'ordered':
+            lines.append('\\end{enumerate}')
+        else:
+            lines.append('\\end{itemize}')
+    
+    return '\n'.join(lines)
+
+
+def split_sections(blocks):
+    """按 H1/H2 分章节"""
+    sections = []
+    current = {'heading': None, 'blocks': []}
+    
+    for block in blocks:
+        block_type = block.get('type')
+        
+        # 在 H1/H2 处分割
+        if block_type == 'heading' and block.get('level', 3) <= 2:
+            if current['blocks']:
+                sections.append(current)
+                current = {'heading': None, 'blocks': []}
+        
+        if current['heading'] is None and block_type == 'heading':
+            current['heading'] = block.get('content')
+        
+        current['blocks'].append(block)
+    
+    if current['blocks']:
+        sections.append(current)
+    
+    if not sections:
+        sections.append({'heading': 'content', 'blocks': []})
+    
+    return sections
+
+
+def generate_main_tex(title, sections):
+    """生成 main.tex"""
+    lines = [
+        '\\documentclass[UTF8, a4paper, 12pt]{ctexart}',
+        '\\usepackage{styles/feishu}',
+        '',
+        f'\\title{{{escape_tex(title)}}}',
+        '\\author{}',
+        '\\date{\\today}',
+        '',
+        '\\begin{document}',
+        '\\maketitle',
+        '\\tableofcontents',
+        '\\newpage',
+        '',
+    ]
+    
+    for i, section in enumerate(sections):
+        num = str(i + 1).zfill(2)
+        heading = section.get('heading')
+        clean_heading = strip_heading_number(heading) if heading else None
+        name = sanitize_ascii(clean_heading or 'content')
+        lines.append(f'\\input{{sections/{num}-{name}}}')
+        lines.append('')
+    
+    lines.append('\\end{document}')
+    return '\n'.join(lines)
+
+
+def generate_style_file():
+    """生成样式文件"""
+    return r"""\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{feishu}[2024/01/01 Feishu Document Style]
+
+\RequirePackage{graphicx}
+\RequirePackage{hyperref}
+\RequirePackage{xcolor}
+\RequirePackage{soul}
+\RequirePackage{listings}
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{geometry}
+\RequirePackage{fancyhdr}
+\RequirePackage{enumitem}
+\RequirePackage{booktabs}
+
+\geometry{a4paper, margin=2.5cm}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  tabsize=4,
+  showstringspaces=false,
+}
+
+\setlist{noitemsep, topsep=0pt}
+
+"""
+
+
+def generate_latexmkrc():
+    """生成 latexmkrc"""
+    return """$pdf_mode = 5;
+$xelatex = "xelatex -interaction=nonstopmode -file-line-error %O %S";
+"""
