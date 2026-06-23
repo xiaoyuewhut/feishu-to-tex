@@ -34,6 +34,12 @@ python3 -m feishu2tex <URL> ./test
 # 语法检查
 python3 -m py_compile convert.py
 python3 -m py_compile feishu2tex/__main__.py
+
+# 编译测试
+export PATH="$HOME/Library/TinyTeX/bin/universal-darwin:$PATH"
+cd test/<项目目录>
+xelatex -interaction=nonstopmode main.tex  # 第一次生成 .toc
+xelatex -interaction=nonstopmode main.tex  # 第二次插入目录
 ```
 
 ## 关键约定
