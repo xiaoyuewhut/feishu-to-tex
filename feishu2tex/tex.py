@@ -110,29 +110,50 @@ def generate_tex(blocks):
             if rows:
                 cols = max(len(row) for row in rows)
                 
-                # 计算每列最大字符数
+                # 计算每列的总字符数和最大字符数
+                col_total_chars = [0] * cols
                 col_max_chars = [0] * cols
+                col_counts = [0] * cols
+                
                 for row in rows:
                     for i, cell in enumerate(row):
                         if i < cols:
-                            col_max_chars[i] = max(col_max_chars[i], len(str(cell)))
+                            cell_len = len(str(cell))
+                            col_total_chars[i] += cell_len
+                            col_max_chars[i] = max(col_max_chars[i], cell_len)
+                            if cell_len > 0:
+                                col_counts[i] += 1
+                
+                # 计算每列的平均字符数
+                col_avg_chars = []
+                for i in range(cols):
+                    if col_counts[i] > 0:
+                        col_avg_chars.append(col_total_chars[i] / col_counts[i])
+                    else:
+                        col_avg_chars.append(1)
+                
+                # 根据平均字符数计算列宽比例
+                total_avg = sum(col_avg_chars)
+                col_widths = [(avg / total_avg) * 0.92 for avg in col_avg_chars]
+                
+                # 确保最小列宽
+                min_width = 0.10
+                col_widths = [max(w, min_width) for w in col_widths]
+                
+                # 归一化
+                total_width = sum(col_widths)
+                col_widths = [w / total_width for w in col_widths]
                 
                 lines.append('\\begin{table}[htbp]')
                 lines.append('  \\centering')
                 lines.append('  \\small')
-                lines.append('  \\renewcommand{\\arraystretch}{1.2}')  # 增加行高
+                lines.append('  \\renewcommand{\\arraystretch}{1.4}')
                 
-                # 统一使用 tabularx 自适应页宽
-                # 根据每列内容长度分配 X 或 Y 类型
-                col_specs = []
-                for max_chars in col_max_chars:
-                    if max_chars > 20:
-                        col_specs.append('X')  # 长文本左对齐自动换行
-                    else:
-                        col_specs.append('Y')  # 短文本居中
+                # 使用 M{} 类型实现垂直居中 + 允许换行 + 居中对齐
+                col_specs = [f'M{{{w:.3f}\\textwidth}}' for w in col_widths]
                 col_spec = ''.join(col_specs)
                 
-                lines.append(f'  \\begin{{tabularx}}{{\\textwidth}}{{{col_spec}}}')
+                lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
                 lines.append('    \\toprule')
                 
                 for r, row in enumerate(rows):
@@ -148,7 +169,7 @@ def generate_tex(blocks):
                         lines.append(f'    {" & ".join(cells)} \\\\')
                 
                 lines.append('    \\bottomrule')
-                lines.append('  \\end{tabularx}')
+                lines.append('  \\end{tabular}')
                 lines.append('\\end{table}')
                 lines.append('')
     
@@ -237,6 +258,7 @@ def generate_style_file():
 \RequirePackage{booktabs}
 \RequirePackage{tabularx}
 \RequirePackage{array}
+\RequirePackage{ragged2e}
 
 \geometry{a4paper, margin=2.5cm}
 
@@ -258,9 +280,9 @@ def generate_style_file():
 
 \setlist{noitemsep, topsep=0pt}
 
-% 表格样式
-\newcolumntype{Y}{>{\centering\arraybackslash}X}
-\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+% 表格样式：垂直居中 + 允许换行 + 居中对齐
+\newcolumntype{Y}{>{\Centering\arraybackslash}X}
+\newcolumntype{M}[1]{>{\Centering\arraybackslash}m{#1}}
 
 """
 
