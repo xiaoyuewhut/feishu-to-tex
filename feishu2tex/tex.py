@@ -109,20 +109,53 @@ def generate_tex(blocks):
             rows = block.get('rows', [])
             if rows:
                 cols = max(len(row) for row in rows)
+                
+                # 计算每列最大字符数，用于判断是否需要固定宽度
+                col_max_chars = [0] * cols
+                for row in rows:
+                    for i, cell in enumerate(row):
+                        if i < cols:
+                            col_max_chars[i] = max(col_max_chars[i], len(str(cell)))
+                
+                total_chars = sum(col_max_chars)
+                
                 lines.append('\\begin{table}[htbp]')
                 lines.append('  \\centering')
-                lines.append(f'  \\begin{{tabular}}{{{"l" * cols}}}')
-                lines.append('    \\hline')
+                lines.append('  \\small')  # 使用较小字体
+                
+                # 根据表格宽度选择合适的格式
+                if total_chars > 80:
+                    # 宽表格使用 tabularx 自适应宽度
+                    col_spec = '|'.join(['Y'] * cols)
+                    lines.append(f'  \\begin{{tabularx}}{{\\textwidth}}{{|{col_spec}|}}')
+                else:
+                    # 窄表格使用居中的固定宽度
+                    col_spec = '|'.join(['c'] * cols)
+                    lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
+                
+                lines.append('    \\toprule')
+                
                 for r, row in enumerate(rows):
-                    cells = [escape_tex(cell) for cell in row]
+                    cells = [escape_tex(str(cell)) for cell in row]
                     # 补齐空单元格
                     while len(cells) < cols:
                         cells.append('')
-                    lines.append(f'    {" & ".join(cells)} \\\\')
+                    
                     if r == 0:
-                        lines.append('    \\hline')
-                lines.append('    \\hline')
-                lines.append('  \\end{tabular}')
+                        # 表头加粗居中
+                        header_cells = [f'\\textbf{{{cell}}}' for cell in cells]
+                        lines.append(f'    {" & ".join(header_cells)} \\\\')
+                        lines.append('    \\midrule')
+                    else:
+                        lines.append(f'    {" & ".join(cells)} \\\\')
+                
+                lines.append('    \\bottomrule')
+                
+                if total_chars > 80:
+                    lines.append('  \\end{tabularx}')
+                else:
+                    lines.append('  \\end{tabular}')
+                
                 lines.append('\\end{table}')
                 lines.append('')
     
@@ -209,6 +242,8 @@ def generate_style_file():
 \RequirePackage{fancyhdr}
 \RequirePackage{enumitem}
 \RequirePackage{booktabs}
+\RequirePackage{tabularx}
+\RequirePackage{array}
 
 \geometry{a4paper, margin=2.5cm}
 
@@ -229,6 +264,10 @@ def generate_style_file():
 }
 
 \setlist{noitemsep, topsep=0pt}
+
+% 表格样式
+\newcolumntype{Y}{>{\centering\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
 
 """
 
