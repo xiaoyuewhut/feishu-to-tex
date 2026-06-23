@@ -88,18 +88,11 @@ def generate_table_tex(rows):
     lines = []
     cols = max(len(row) for row in rows)
     
-    # 计算列宽
-    col_widths = calc_col_widths(rows, cols)
-    
-    # 计算合并信息
-    merge_info = calc_merge_info(rows, cols)
-    
     # 判断是否使用 longtable（超过 20 行）
     use_longtable = len(rows) > 20
     
-    # 使用 M{} 类型实现垂直居中 + 允许换行 + 居中对齐
-    col_specs = [f'M{{{w:.3f}\\textwidth}}' for w in col_widths]
-    col_spec = ''.join(col_specs)
+    # 生成列规格：使用 X 类型自动分配宽度
+    col_spec = '|' + '|'.join(['X'] * cols) + '|'
     
     if use_longtable:
         lines.append('\\begin{longtable}{' + col_spec + '}')
@@ -116,7 +109,7 @@ def generate_table_tex(rows):
         lines.append('  \\endhead')
         # 续表表尾
         lines.append('  \\midrule')
-        lines.append('  \\multicolumn{' + str(cols) + '}{r}{\\textit{续下页}} \\\\')
+        lines.append(f'  \\multicolumn{{{cols}}}{{r}}{{\\textit{{续下页}}}} \\\\')
         lines.append('  \\endfoot')
         # 最后一页表尾
         lines.append('  \\bottomrule')
@@ -126,11 +119,14 @@ def generate_table_tex(rows):
         lines.append('  \\centering')
         lines.append('  \\small')
         lines.append('  \\renewcommand{\\arraystretch}{1.4}')
-        lines.append(f'  \\begin{{tabular}}{{{col_spec}}}')
+        lines.append(f'  \\begin{{tabularx}}{{\\textwidth}}{{{col_spec}}}')
         lines.append('    \\toprule')
     
+    # 计算合并信息
+    merge_info = calc_merge_info(rows, cols)
+    
     # 生成表格行
-    start_row = 1 if use_longtable else 1
+    start_row = 1
     for r in range(start_row, len(rows)):
         row = rows[r]
         cells = []
@@ -140,27 +136,20 @@ def generate_table_tex(rows):
             if info is None:
                 cells.append('')
             elif info[0] == 0:
-                # 被合并的单元格
                 cells.append('')
             elif info[0] > 1:
-                # 使用 multirow 合并
                 cells.append(f'\\multirow{{{info[0]}}}{{*}}{{{escape_tex(info[1])}}}')
             else:
                 cells.append(escape_tex(info[1]))
         
-        if r == 0:
-            header_cells = [f'\\textbf{{{cell}}}' for cell in cells]
-            lines.append(f'    {" & ".join(header_cells)} \\\\')
-            lines.append('    \\midrule')
-        else:
-            indent = '  ' if use_longtable else '    '
-            lines.append(f'{indent}{" & ".join(cells)} \\\\')
+        indent = '  ' if use_longtable else '    '
+        lines.append(f'{indent}{" & ".join(cells)} \\\\')
     
     if use_longtable:
         lines.append('\\end{longtable}')
     else:
         lines.append('    \\bottomrule')
-        lines.append('  \\end{tabular}')
+        lines.append('  \\end{tabularx}')
         lines.append('\\end{table}')
     
     lines.append('')
