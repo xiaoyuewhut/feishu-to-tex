@@ -156,7 +156,7 @@ def parse_element(elem):
     
     if tag == 'checkbox':
         done = elem.get('done', 'false') == 'true'
-        content = get_text(elem)
+        content = get_rich_text(elem)
         return {'type': 'checkbox', 'done': done, 'content': content}
     
     # 默认作为段落处理
