@@ -2,6 +2,8 @@
 
 from .utils import escape_tex
 
+MAX_ROW_SPAN = 2
+
 
 def calc_col_weights(rows, cols):
     """根据内容计算每列权重（用于 tabularray 的 X 列）"""
@@ -158,7 +160,7 @@ def generate_table_tex(rows):
                 cells.append('')
             elif info[0] == 0:
                 cells.append('')
-            elif info[0] > 1:
+            elif info[0] > 1 and info[0] <= MAX_ROW_SPAN:
                 cells.append(f'\\SetCell[r={info[0]}]{{l}} {escape_tex(info[1])}')
             else:
                 cells.append(escape_tex(info[1]))
