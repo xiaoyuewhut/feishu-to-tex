@@ -78,10 +78,12 @@ def generate_tex(blocks):
         elif block_type == 'code_block':
             lang = block.get('language', '')
             caption = block.get('caption', '')
+            # 只保留安全字符作为语言名
+            safe_lang = re.sub(r'[^a-zA-Z0-9#+-]', '', lang) if lang else ''
             if caption:
-                lines.append(f'\\begin{{lstlisting}}[language={lang}, caption={{{caption}}}]')
+                lines.append(f'\\begin{{lstlisting}}[language={safe_lang}, caption={{{escape_tex(caption)}}}]')
             else:
-                lines.append(f'\\begin{{lstlisting}}[language={lang}]')
+                lines.append(f'\\begin{{lstlisting}}[language={safe_lang}]')
             lines.append(block['content'])
             lines.append('\\end{lstlisting}')
             lines.append('')
