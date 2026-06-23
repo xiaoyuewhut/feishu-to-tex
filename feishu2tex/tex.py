@@ -44,6 +44,9 @@ def generate_tex(blocks):
                    'paragraph', 'subparagraph', 'subparagraph'][min(level - 1, 5)]
             heading_text = strip_heading_number(block["content"])
             if heading_text:
+                # 在 section 和 subsection 前加分页符
+                if level <= 2:
+                    lines.append('\\newpage')
                 lines.append(f'\\{cmd}{{{heading_text}}}')
                 lines.append('')
         
