@@ -220,9 +220,9 @@ def generate_style_file():
 
 \setlist{noitemsep, topsep=0pt}
 
-% 表格样式：垂直居中 + 允许换行 + 居中对齐
-\newcolumntype{Y}{>{\Centering\arraybackslash}X}
-\newcolumntype{M}[1]{>{\Centering\arraybackslash}m{#1}}
+% 表格样式：垂直居中 + 允许换行 + 左对齐
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{M}[1]{>{\RaggedRight\arraybackslash}m{#1}}
 
 """
 
