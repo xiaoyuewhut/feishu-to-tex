@@ -1,2 +1,7 @@
 .DS_Store
 .crush/
+__pycache__/
+*.pyc
+*.pyo
+test/*.zip
+test/*.pdf

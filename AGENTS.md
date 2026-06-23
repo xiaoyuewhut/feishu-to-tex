@@ -1,41 +1,53 @@
 # AGENTS.md
 
-## Project
+## 项目
 
-Chrome extension (Manifest V3) converting Feishu/Lark documents to LaTeX.
-Stage: L0 skeleton — DOM-based extraction, single-file .tex export, no build step.
+飞书文档转 LaTeX CLI 工具。用法: `python3 convert.py <飞书文档URL> [输出目录]`
 
-## Structure
+## 核心依赖
+
+- Python 3.7+
+- lark-cli (`brew install larksuite/tap/lark-cli`)
+- 飞书账号登录: `lark-cli auth login`
+
+## 结构
 
 ```
-manifest.json            # MV3 — content script matches /docx/, /docs/, /wiki/ on feishu.cn + larksuite.com
-src/content/main.js      # injected into Feishu pages: DOM → block AST, sends via chrome.runtime.sendMessage
-src/popup/popup.html     # popup markup
-src/popup/popup.js       # popup UI + inline TeX generator + chrome.downloads API
-icons/                   # extension icons (empty in L0)
+convert.py          # 主脚本，解析飞书 XML 并生成 LaTeX 项目
+test/               # 测试输出，每个文档一个子文件夹
+README.md           # 用户文档
 ```
 
-PRD is in-repo: `飞书文档转TeX项目Chrome插件_PRD.md`
+## 关键约定
 
-## Conventions
+- 调用 `lark-cli docs +fetch --api-version v2 --doc <URL> --doc-format xml --detail simple --format json` 获取文档
+- 解析 XML (标准 HTML 子集: p, h1-h6, ul, ol, table, pre, blockquote, img 等)
+- 按 H1/H2 分章节，生成 `sections/01-xxx.tex`
+- 图片自动下载到 `assets/images/`
+- 样式文件在 `styles/feishu.sty`
 
-- **No build system.** Raw JS, no bundler, no package.json. Edit → reload extension in `chrome://extensions/`.
-- **No tests or lint.** Verify by loading unpacked extension on a live Feishu doc.
-- **TeX generation is inlined in popup.js**, not a shared module. `escapeTex` exists in both content/main.js and popup/popup.js — keep in sync when changing escaping rules.
-- **Content script must handle 3 path types:** `/docx/*`, `/docs/*`, `/wiki/*` on both `feishu.cn` and `larksuite.com`. When adding URL patterns, update `manifest.json` matches AND the regexes in `content/main.js`.
-- **Block detection is regex-based on class + data-type attributes.** Feishu DOM changes without notice. Fallback path (main.js lines 115-126) catches unstructured content.
-- **Target TeX engine:** XeLaTeX/LuaLaTeX via `ctexart`. Uses `listings` (not `minted`) to avoid Python dependency.
+## 常用命令
 
-## Gotchas
+```bash
+# 测试转换
+python3 convert.py <URL> ./test
 
-- `chrome.runtime.onMessage` requires synchronous `sendResponse`. Content script returns synchronously; if you make it async, return `true` from the listener.
-- Images are NOT downloaded in L0 — only `% TODO:` comments are emitted.
-- `icons/` is empty; Chrome shows a default icon. Add 16/48/128 PNGs and update manifest `default_icon` when ready.
+# 检查语法
+python3 -m py_compile convert.py
+```
 
-## Manual test
+## XML 格式要点
 
-1. `chrome://extensions/` → Developer mode → Load unpacked → select repo root
-2. Open a Feishu doc (`/docx/`, `/docs/`, or `/wiki/` path)
-3. Click extension icon → should show "已检测到飞书文档" with block count
-4. Click export → downloads a `.tex` file
-5. Upload `.tex` to Overleaf to verify compilation (no local TeX needed)
+- `<title>` 是文档标题
+- `<pre lang="xxx"><code>...</code></pre>` 是代码块
+- `<img href="..."/>` 是图片，需要下载
+- `<latex>...</latex>` 是行内公式
+- `<callout>` 是高亮框
+- `<checkbox done="true|false">` 是待办项
+
+## 注意事项
+
+- lark-cli 输出的 XML 中 `&` 已转义为 `&amp;`，不要重复转义
+- 表格可能有 `<thead>` / `<tbody>`，也可能直接是 `<tr>`
+- 图片 URL 可能是飞书内部 URL，需要能访问
+- 测试目录 `test/` 下的文件不提交到 git

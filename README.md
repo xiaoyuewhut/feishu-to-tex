@@ -20,23 +20,13 @@ lark-cli auth login
 
 ## 使用
 
-### CLI 工具 (推荐)
-
 ```bash
-# 基本用法
+# 基本用法 - 输出到当前目录
 python3 convert.py https://xxx.feishu.cn/docx/Z1Fj...tnAc
 
 # 指定输出目录
-python3 convert.py https://xxx.feishu.cn/wiki/xxx ./output
+python3 convert.py https://xxx.feishu.cn/wiki/xxx ./test
 ```
-
-输出:
-- 生成的 LaTeX 项目目录
-- `.zip` 压缩包 (可直接上传 Overleaf)
-
-### Chrome 插件 (旧版, 不推荐)
-
-Chrome 插件版本使用 DOM 解析，格式支持有限，建议使用 CLI 工具。
 
 ## 转换能力
 
@@ -68,12 +58,20 @@ doc-title/
 
 ## 编译
 
-上传 `.zip` 到 [Overleaf](https://overleaf.com)，选择 XeLaTeX 编译器即可。
+上传项目目录到 [Overleaf](https://overleaf.com)，选择 XeLaTeX 编译器。
 
 本地编译:
 ```bash
 cd doc-title
 latexmk -xelatex main.tex
+```
+
+## 测试
+
+测试文件放在 `test/` 目录，每个文档自成一个子文件夹。
+
+```bash
+python3 convert.py <URL> ./test
 ```
 
 ## 已知限制

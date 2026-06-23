@@ -8,9 +8,7 @@ import sys
 import os
 import json
 import subprocess
-import zipfile
 import re
-import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 import xml.etree.ElementTree as ET
@@ -628,17 +626,6 @@ def create_project(blocks, title, doc_id, output_dir):
     return project_dir, folder_name
 
 
-def create_zip(project_dir, folder_name, output_path):
-    """将项目打包为 ZIP"""
-    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for root, dirs, files in os.walk(project_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.join(folder_name, os.path.relpath(file_path, project_dir))
-                zf.write(file_path, arcname)
-    return output_path
-
-
 def main():
     if len(sys.argv) < 2:
         print('用法: python3 convert.py <飞书文档URL> [输出目录]')
@@ -685,14 +672,9 @@ def main():
         print('正在生成 LaTeX 项目...')
         project_dir, folder_name = create_project(blocks, title, doc_id, output_dir)
         
-        # 创建 ZIP
-        zip_path = os.path.join(output_dir, f'{sanitize_filename(title)}.zip')
-        create_zip(project_dir, folder_name, zip_path)
-        
         print(f'\n✓ 完成!')
         print(f'  项目目录: {project_dir}')
-        print(f'  ZIP 文件: {zip_path}')
-        print(f'\n上传 {zip_path} 到 Overleaf 即可编译')
+        print(f'\n上传 {project_dir} 到 Overleaf 即可编译')
         
     except Exception as e:
         print(f'错误: {e}')
