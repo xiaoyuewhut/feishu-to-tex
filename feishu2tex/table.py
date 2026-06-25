@@ -168,7 +168,7 @@ def generate_table_tex(rows):
     merge_info = calc_merge_info(rows, cols)
     
     # 判断表格大小：小表用浮动体，大表用longtblr跨页
-    SMALL_TABLE_MAX_ROWS = 20
+    SMALL_TABLE_MAX_ROWS = 25
     is_small_table = len(rows) <= SMALL_TABLE_MAX_ROWS
     
     lines.append('\\small')
