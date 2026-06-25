@@ -198,14 +198,15 @@ def generate_main_tex(title, sections):
         '% ===== 封面 =====',
         '\\begin{titlepage}',
         '  \\centering',
-        '  \\vspace*{3cm}',
-        '  {\\Huge\\bfseries ' + escape_tex(title) + '\\\\}',
-        '  \\vspace{2cm}',
-        '  {\\Large 生成于 \\today\\\\}',
+        '  \\vspace*{2cm}',
+        '  \\rule{\\textwidth}{1pt}',
         '  \\vspace{1cm}',
-        '  {\\large 由飞书云文档自动转换\\\\}',
-        '  \\vfill',
+        '  {\\Huge\\bfseries ' + escape_tex(title) + '\\\\}',
+        '  \\vspace{1cm}',
+        '  \\rule{\\textwidth}{1pt}',
         '  \\vspace{3cm}',
+        '  {\\Large\\today\\\\}',
+        '  \\vfill',
         '\\end{titlepage}',
         '',
         '% ===== 目录 =====',
@@ -228,9 +229,11 @@ def generate_main_tex(title, sections):
     lines.append('\\thispagestyle{empty}')
     lines.append('\\vspace*{\\fill}')
     lines.append('\\begin{center}')
-    lines.append('  {\\Large ' + escape_tex(title) + '\\\\}')
+    lines.append('  \\rule{0.5\\textwidth}{1pt}')
     lines.append('  \\vspace{1cm}')
-    lines.append('  {\\large 完\\\\}')
+    lines.append('  {\\Huge\\bfseries ' + escape_tex(title) + '\\\\}')
+    lines.append('  \\vspace{1cm}')
+    lines.append('  \\rule{0.5\\textwidth}{1pt}')
     lines.append('\\end{center}')
     lines.append('\\vspace*{\\fill}')
     lines.append('')
