@@ -51,15 +51,13 @@ def calc_col_weights(rows, cols):
             else:
                 content_widths.append(w)
         
-        # 用 max(表头宽度, 内容80分位宽度) 作为该列权重
+        # 用 max(表头宽度, 内容最大宽度) 作为该列权重
         if content_widths:
-            content_widths.sort()
-            idx = int(len(content_widths) * 0.8)
-            p80 = content_widths[min(idx, len(content_widths) - 1)]
+            max_w = max(content_widths)
         else:
-            p80 = 0
+            max_w = 0
         
-        col_weights.append(max(header_w, p80, 1))
+        col_weights.append(max(header_w, max_w, 1))
     
     # 归一化为整数权重（最小1）
     min_w = min(col_weights)
