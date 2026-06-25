@@ -3,6 +3,17 @@
 from .utils import escape_tex
 
 
+ROWSPAN_PAGEBREAK_THRESHOLD = 6
+MIN_ROWS_FOR_ROWSPAN_PAGEBREAK = 24
+
+
+def cell_text(row, col):
+    """取单元格文本，越界视为空。"""
+    if col >= len(row):
+        return ''
+    return str(row[col]).strip()
+
+
 def calc_col_weights(rows, cols):
     """根据内容计算每列权重（用于 tabularray 的 X 列）"""
     def char_width(ch):
@@ -55,6 +66,18 @@ def calc_col_weights(rows, cols):
     col_weights = [max(1, round(w / min_w)) for w in col_weights]
     
     return col_weights
+
+
+def trim_empty_tail_cols(rows):
+    """裁掉全空尾列，避免 colspec 与实际列数不一致。"""
+    cols = max(len(row) for row in rows)
+    while cols > 0:
+        last_col = cols - 1
+        if all(cell_text(row, last_col) == '' for row in rows):
+            cols -= 1
+        else:
+            break
+    return max(cols, 1)
 
 
 def calc_merge_info(rows, cols):
@@ -115,13 +138,27 @@ def calc_merge_info(rows, cols):
     return merge_info
 
 
+def row_starts_large_span(merge_info, row_index, cols):
+    """判断当前行是否开始了较大的纵向合并块。"""
+    for c in range(cols):
+        info = merge_info[row_index][c]
+        if info and info[0] >= ROWSPAN_PAGEBREAK_THRESHOLD:
+            return True
+    return False
+
+
+def should_hint_rowspan_pagebreak(rows):
+    """短表通常能整体放下，不需要给 rowspan 额外分页提示。"""
+    return len(rows) >= MIN_ROWS_FOR_ROWSPAN_PAGEBREAK
+
+
 def generate_table_tex(rows):
     """生成表格的 LaTeX 代码（使用 tabularray 的 longtblr）"""
     if not rows:
         return ''
     
     lines = []
-    cols = max(len(row) for row in rows)
+    cols = trim_empty_tail_cols(rows)
     
     # 计算列权重
     col_weights = calc_col_weights(rows, cols)
@@ -129,7 +166,8 @@ def generate_table_tex(rows):
     
     # 计算合并信息
     merge_info = calc_merge_info(rows, cols)
-    
+    use_rowspan_pagebreak = should_hint_rowspan_pagebreak(rows)
+
     # 使用 tabularray 的 longtblr
     lines.append('\\small')
     lines.append('\\begin{longtblr}[')
@@ -138,6 +176,7 @@ def generate_table_tex(rows):
     lines.append(']{')
     lines.append(f'  width=\\linewidth,')
     lines.append(f'  colspec={{{colspec}}},')
+    lines.append('  cells={valign=m},')
     lines.append('  rowhead=1,')
     lines.append('  hlines,')
     lines.append('  hline{1,Z}={1pt},')
@@ -151,7 +190,8 @@ def generate_table_tex(rows):
     # 数据行
     for r in range(1, len(rows)):
         row = rows[r]
-        
+        if use_rowspan_pagebreak and row_starts_large_span(merge_info, r, cols):
+            lines.append('  \\pagebreak[3]')
         cells = []
         for c in range(cols):
             info = merge_info[r][c]
