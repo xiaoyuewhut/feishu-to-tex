@@ -94,7 +94,7 @@ def create_project(blocks, title, doc_id, output_dir):
         name = sanitize_ascii(clean_heading or 'content')
         filename = f'{num}-{name}.tex'
         
-        section_tex = generate_tex(section.get('blocks', []))
+        section_tex = generate_tex(section.get('blocks', []), section.get('heading'))
         with open(os.path.join(project_dir, 'sections', filename), 'w', encoding='utf-8') as f:
             f.write(section_tex)
     

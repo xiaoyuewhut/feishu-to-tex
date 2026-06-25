@@ -6,10 +6,19 @@ from .utils import escape_tex, strip_heading_number, sanitize_ascii
 from .table import generate_table_tex
 
 
-def generate_tex(blocks):
+def generate_tex(blocks, section_heading=None):
     """将块列表转换为 TeX 内容"""
     lines = []
     in_list = None
+    image_count = 0
+    table_count = 0
+    # 提取章节序号（如 "1.1 跟车能力" -> "1.1"）
+    section_num = None
+    if section_heading:
+        import re
+        m = re.match(r'^([\d]+(\.[\d]+)*\.?)\s*', section_heading)
+        if m:
+            section_num = m.group(1).rstrip('.')
     
     for i, block in enumerate(blocks):
         block_type = block.get('type')
@@ -123,7 +132,13 @@ def generate_tex(blocks):
         elif block_type == 'table':
             rows = block.get('rows', [])
             if rows:
-                lines.append(generate_table_tex(rows))
+                table_count += 1
+                # 生成 caption: 章节序号 + 表编号
+                if section_num:
+                    caption = f'{section_num} 表{table_count}'
+                else:
+                    caption = f'表{table_count}'
+                lines.append(generate_table_tex(rows, caption))
     
     # 关闭最后的列表
     if in_list:

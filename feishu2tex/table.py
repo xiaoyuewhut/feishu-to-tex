@@ -150,7 +150,7 @@ def should_hint_rowspan_pagebreak(rows):
     return len(rows) >= MIN_ROWS_FOR_ROWSPAN_PAGEBREAK
 
 
-def generate_table_tex(rows):
+def generate_table_tex(rows, caption=None):
     """生成表格的 LaTeX 代码"""
     if not rows:
         return ''
@@ -222,8 +222,12 @@ def generate_table_tex(rows):
     
     if is_small_table:
         lines.append('  \\end{tblr}')
+        if caption:
+            lines.append(f'  \\caption{{{escape_tex(caption)}}}')
         lines.append('\\end{table}')
     else:
+        if caption:
+            lines.append(f'  \\caption{{{escape_tex(caption)}}}')
         lines.append('\\end{longtblr}')
     
     lines.append('')
