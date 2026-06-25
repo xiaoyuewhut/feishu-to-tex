@@ -4,11 +4,17 @@
 
 飞书文档转 LaTeX CLI 工具。
 
+## 核心约束
+
+- **所有改进必须面向通用场景**，不能针对某个文档做单独优化
+- 设计时考虑：任意飞书文档、任意表格结构、任意图片数量、任意章节深度
+
 ## 核心依赖
 
 - Python 3.7+
 - lark-cli (`brew install larksuite/tap/lark-cli`)
 - 飞书账号登录: `lark-cli auth login`
+- TinyTeX 需安装: `tabularray`, `tcolorbox`, `needspace`
 
 ## 结构
 
@@ -20,7 +26,7 @@ feishu2tex/          # 主包
 ├── feishu.py        # 飞书 API 调用和 XML 解析
 ├── tex.py           # LaTeX 代码生成
 ├── project.py       # 项目文件夹创建
-├── table.py         # 表格解析与生成
+├── table.py         # 表格解析与生成 (tabularray)
 └── utils.py         # 工具函数 (转义、清理等)
 convert.py           # 快捷入口脚本
 test/                # 测试输出 (gitignore)
@@ -31,11 +37,10 @@ test/                # 测试输出 (gitignore)
 ```bash
 # 转换文档
 python3 convert.py <URL> ./test
-python3 -m feishu2tex <URL> ./test
 
 # 语法检查
-python3 -m py_compile convert.py
-python3 -m py_compile feishu2tex/__main__.py
+python3 -m py_compile feishu2tex/table.py
+python3 -m py_compile feishu2tex/tex.py
 
 # 编译测试
 export PATH="$HOME/Library/TinyTeX/bin/universal-darwin:$PATH"
@@ -44,13 +49,21 @@ xelatex -interaction=nonstopmode main.tex  # 第一次生成 .toc
 xelatex -interaction=nonstopmode main.tex  # 第二次插入目录
 ```
 
-## 关键约定
+## 关键设计决策
 
-- lark-cli 命令: `lark-cli docs +fetch --api-version v2 --doc <URL> --doc-format xml --detail simple --format json`
-- XML 标签: `<title>`, `<h1>-<h6>`, `<ul>/<ol>/<li>`, `<pre>/<code>`, `<img>`, `<table>`, `<callout>`, `<checkbox>`
-- 按 H1/H2 分章节
-- 标题序号自动去掉 (如 "1.1 跟车能力" → "跟车能力")
-- 数学符号转义: `≤` → `$\leq$`, `≥` → `$\geq$`
+### 表格 (table.py)
+- 使用 `tabularray` 的 `longtblr` 环境，X 列自动分配宽度
+- 合并逻辑：指标-权重成对合并（权重列只能跟随对应指标列范围）
+- 大跨度合并保留，不做 MAX_ROW_SPAN 限制
+
+### 图片 (tex.py)
+- 使用 `[htbp]` 浮动体，自适应尺寸（宽度撑满，高度限制 0.7\textheight）
+- 无 caption 时留空 `\caption{}`，让 LaTeX 自动编号
+- 有 caption 时保留原样
+
+### 特殊字符 (utils.py)
+- escape_tex() 处理 TeX 特殊字符和 Unicode 符号（★☆●○→←等）
+- 标题和 icon 都必须经过 escape_tex() 转义
 
 ## 注意事项
 
@@ -58,3 +71,4 @@ xelatex -interaction=nonstopmode main.tex  # 第二次插入目录
 - 图片 URL 可能是飞书内部 URL，需要网络访问
 - 测试目录 `test/` 不提交到 git
 - 文件名保留中文字符
+- lark-cli API 偶尔会返回 "Internal error"，需要重试
