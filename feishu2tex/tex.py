@@ -49,9 +49,9 @@ def generate_tex(blocks, section_heading=None):
                    'paragraph', 'subparagraph', 'subparagraph'][min(level - 1, 5)]
             heading_text = escape_tex(strip_heading_number(block["content"]))
             if heading_text:
-                # 在 section 和 subsection 前加分页符
+                # 在 section 前用 cleardoublepage（奇数页开始）
                 if level <= 2:
-                    lines.append('\\newpage')
+                    lines.append('\\cleardoublepage')
                 lines.append(f'\\{cmd}{{{heading_text}}}')
                 lines.append('')
             
@@ -185,7 +185,7 @@ def split_sections(blocks):
 def generate_main_tex(title, sections):
     """生成 main.tex"""
     lines = [
-        '\\documentclass[UTF8, a4paper, 12pt]{ctexart}',
+        '\\documentclass[UTF8, a4paper, 12pt, twoside, openright]{ctexbook}',
         '\\usepackage{styles/feishu}',
         '\\raggedbottom',
         '',
@@ -194,9 +194,23 @@ def generate_main_tex(title, sections):
         '\\date{\\today}',
         '',
         '\\begin{document}',
-        '\\maketitle',
+        '',
+        '% ===== 封面 =====',
+        '\\begin{titlepage}',
+        '  \\centering',
+        '  \\vspace*{3cm}',
+        '  {\\Huge\\bfseries ' + escape_tex(title) + '\\\\}',
+        '  \\vspace{2cm}',
+        '  {\\Large 生成于 \\today\\\\}',
+        '  \\vspace{1cm}',
+        '  {\\large 由飞书云文档自动转换\\\\}',
+        '  \\vfill',
+        '  \\vspace{3cm}',
+        '\\end{titlepage}',
+        '',
+        '% ===== 目录 =====',
         '\\tableofcontents',
-        '\\newpage',
+        '\\cleardoublepage',
         '',
     ]
     
@@ -208,6 +222,18 @@ def generate_main_tex(title, sections):
         lines.append(f'\\input{{sections/{num}-{name}}}')
         lines.append('')
     
+    # ===== 封底 =====
+    lines.append('% ===== 封底 =====')
+    lines.append('\\cleardoublepage')
+    lines.append('\\thispagestyle{empty}')
+    lines.append('\\vspace*{\\fill}')
+    lines.append('\\begin{center}')
+    lines.append('  {\\Large ' + escape_tex(title) + '\\\\}')
+    lines.append('  \\vspace{1cm}')
+    lines.append('  {\\large 完\\\\}')
+    lines.append('\\end{center}')
+    lines.append('\\vspace*{\\fill}')
+    lines.append('')
     lines.append('\\end{document}')
     return '\n'.join(lines)
 
