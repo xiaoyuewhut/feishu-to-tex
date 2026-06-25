@@ -10,7 +10,6 @@ def generate_tex(blocks):
     """将块列表转换为 TeX 内容"""
     lines = []
     in_list = None
-    image_count = 0
     
     for i, block in enumerate(blocks):
         block_type = block.get('type')
@@ -108,15 +107,14 @@ def generate_tex(blocks):
             alt = block.get('alt', '')
             local_path = block.get('local_path', '')
             if local_path:
-                image_count += 1
                 lines.append('\\begin{figure}[htbp]')
                 lines.append('  \\centering')
                 lines.append(f'  \\includegraphics[width=\\textwidth, height=0.7\\textheight, keepaspectratio]{{{local_path}}}')
-                # 判断是否有有效 caption（排除默认值如 paste、image 等）
+                # 有真实 caption 时保留，否则留空让 LaTeX 自动编号
                 if alt and not re.match(r'^(paste|image|img|图片|截图|Pasted image).*$', alt, re.IGNORECASE):
                     lines.append(f'  \\caption{{{escape_tex(alt)}}}')
                 else:
-                    lines.append(f'  \\caption{{图{image_count}}}')
+                    lines.append('  \\caption{}')
                 lines.append('\\end{figure}')
             elif src:
                 lines.append(f'% [图片: {alt or src}]')
