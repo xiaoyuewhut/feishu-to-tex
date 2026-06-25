@@ -12,13 +12,9 @@ def generate_tex(blocks, section_heading=None):
     in_list = None
     image_count = 0
     table_count = 0
-    # 提取章节序号（如 "1.1 跟车能力" -> "1.1"）
-    section_num = None
-    if section_heading:
-        import re
-        m = re.match(r'^([\d]+(\.[\d]+)*\.?)\s*', section_heading)
-        if m:
-            section_num = m.group(1).rstrip('.')
+    current_section_num = None
+    
+    import re
     
     for i, block in enumerate(blocks):
         block_type = block.get('type')
@@ -58,6 +54,14 @@ def generate_tex(blocks, section_heading=None):
                     lines.append('\\newpage')
                 lines.append(f'\\{cmd}{{{heading_text}}}')
                 lines.append('')
+            
+            # 更新当前章节序号，重置表格计数器
+            m = re.match(r'^([\d]+(\.[\d]+)*\.?)\s*', block["content"])
+            if m:
+                new_section_num = m.group(1).rstrip('.')
+                if new_section_num != current_section_num:
+                    current_section_num = new_section_num
+                    table_count = 0
         
         elif block_type == 'paragraph':
             lines.append(block['content'])
@@ -134,8 +138,8 @@ def generate_tex(blocks, section_heading=None):
             if rows:
                 table_count += 1
                 # 生成 caption: 章节序号 + 表编号
-                if section_num:
-                    caption = f'{section_num} 表{table_count}'
+                if current_section_num:
+                    caption = f'{current_section_num} 表{table_count}'
                 else:
                     caption = f'表{table_count}'
                 lines.append(generate_table_tex(rows, caption))
