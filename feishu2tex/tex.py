@@ -197,16 +197,21 @@ def generate_main_tex(title, sections):
         '',
         '% ===== 封面 =====',
         '\\begin{titlepage}',
-        '  \\centering',
-        '  \\vspace*{2cm}',
-        '  \\rule{\\textwidth}{1pt}',
-        '  \\vspace{1cm}',
-        '  {\\Huge\\bfseries ' + escape_tex(title) + '\\\\}',
-        '  \\vspace{1cm}',
-        '  \\rule{\\textwidth}{1pt}',
-        '  \\vspace{3cm}',
-        '  {\\Large\\today\\\\}',
-        '  \\vfill',
+        '  \\begin{tikzpicture}[remember picture, overlay]',
+        '    % 顶部装饰条',
+        '    \\fill[blue!70!black] (current page.north west) rectangle ([yshift=-4cm]current page.north east);',
+        '    \\fill[blue!50!black] ([yshift=-4cm]current page.north west) rectangle ([yshift=-4.3cm]current page.north east);',
+        '    % 底部装饰条',
+        '    \\fill[blue!70!black] (current page.south west) rectangle ([yshift=2cm]current page.south east);',
+        '    \\fill[blue!50!black] ([yshift=2cm]current page.south west) rectangle ([yshift=2.3cm]current page.south east);',
+        '    % 侧边装饰线',
+        '    \\fill[blue!30!white] ([xshift=2cm]current page.north west) rectangle ([xshift=2.15cm]current page.south west);',
+        '    \\fill[blue!30!white] ([xshift=-2cm]current page.north east) rectangle ([xshift=-2.15cm]current page.south east);',
+        '    % 标题',
+        '    \\node[anchor=center, text=white, font=\\Huge\\bfseries] at ([yshift=-2cm]current page.center) {\\parbox{0.85\\textwidth}{\\centering ' + escape_tex(title) + '}};',
+        '    % 日期',
+        '    \\node[anchor=center, text=blue!20!white, font=\\Large] at ([yshift=2cm]current page.center) {\\today};',
+        '  \\end{tikzpicture}',
         '\\end{titlepage}',
         '',
         '% ===== 目录 =====',
@@ -227,15 +232,16 @@ def generate_main_tex(title, sections):
     lines.append('% ===== 封底 =====')
     lines.append('\\cleardoublepage')
     lines.append('\\thispagestyle{empty}')
-    lines.append('\\vspace*{\\fill}')
-    lines.append('\\begin{center}')
-    lines.append('  \\rule{0.5\\textwidth}{1pt}')
-    lines.append('  \\vspace{1cm}')
-    lines.append('  {\\Huge\\bfseries ' + escape_tex(title) + '\\\\}')
-    lines.append('  \\vspace{1cm}')
-    lines.append('  \\rule{0.5\\textwidth}{1pt}')
-    lines.append('\\end{center}')
-    lines.append('\\vspace*{\\fill}')
+    lines.append('\\begin{tikzpicture}[remember picture, overlay]')
+    lines.append('  % 顶部装饰条')
+    lines.append('  \\fill[blue!70!black] (current page.north west) rectangle ([yshift=-3cm]current page.north east);')
+    lines.append('  \\fill[blue!50!black] ([yshift=-3cm]current page.north west) rectangle ([yshift=-3.3cm]current page.north east);')
+    lines.append('  % 底部装饰条')
+    lines.append('  \\fill[blue!70!black] (current page.south west) rectangle ([yshift=2cm]current page.south east);')
+    lines.append('  \\fill[blue!50!black] ([yshift=2cm]current page.south west) rectangle ([yshift=2.3cm]current page.south east);')
+    lines.append('  % 标题')
+    lines.append('  \\node[anchor=center, text=white, font=\\Huge\\bfseries] at (current page.center) {\\parbox{0.85\\textwidth}{\\centering ' + escape_tex(title) + '}};')
+    lines.append('\\end{tikzpicture}')
     lines.append('')
     lines.append('\\end{document}')
     return '\n'.join(lines)
