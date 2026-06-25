@@ -168,6 +168,7 @@ def generate_main_tex(title, sections):
     lines = [
         '\\documentclass[UTF8, a4paper, 12pt]{ctexart}',
         '\\usepackage{styles/feishu}',
+        '\\raggedbottom',
         '',
         f'\\title{{{escape_tex(title)}}}',
         '\\author{}',

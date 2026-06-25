@@ -179,6 +179,7 @@ def generate_table_tex(rows):
     lines.append('  cells={valign=m},')
     lines.append('  rowhead=1,')
     lines.append('  hlines,')
+    lines.append('  vlines,')
     lines.append('  hline{1,Z}={1pt},')
     lines.append('  row{1}={font=\\bfseries},')
     lines.append('}')
