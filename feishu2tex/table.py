@@ -153,7 +153,7 @@ def should_hint_rowspan_pagebreak(rows):
 
 
 def generate_table_tex(rows):
-    """生成表格的 LaTeX 代码（使用 tabularray 的 longtblr）"""
+    """生成表格的 LaTeX 代码"""
     if not rows:
         return ''
     
@@ -166,23 +166,41 @@ def generate_table_tex(rows):
     
     # 计算合并信息
     merge_info = calc_merge_info(rows, cols)
-    use_rowspan_pagebreak = should_hint_rowspan_pagebreak(rows)
-
-    # 使用 tabularray 的 longtblr
+    
+    # 判断表格大小：小表用浮动体，大表用longtblr跨页
+    SMALL_TABLE_MAX_ROWS = 20
+    is_small_table = len(rows) <= SMALL_TABLE_MAX_ROWS
+    
     lines.append('\\small')
-    lines.append('\\begin{longtblr}[')
-    lines.append('  entry={none},')
-    lines.append('  label={none},')
-    lines.append(']{')
-    lines.append(f'  width=\\linewidth,')
-    lines.append(f'  colspec={{{colspec}}},')
-    lines.append('  cells={valign=m},')
-    lines.append('  rowhead=1,')
-    lines.append('  hlines,')
-    lines.append('  vlines,')
-    lines.append('  hline{1,Z}={1pt},')
-    lines.append('  row{1}={font=\\bfseries},')
-    lines.append('}')
+    
+    if is_small_table:
+        # 小表：用普通 tblr + [htbp] 浮动定位，不拆页
+        lines.append('\\begin{table}[htbp]')
+        lines.append('  \\centering')
+        lines.append(f'  \\begin{{tblr}}{{')
+        lines.append(f'    width=\\linewidth,')
+        lines.append(f'    colspec={{{colspec}}},')
+        lines.append('    cells={valign=m},')
+        lines.append('    hlines,')
+        lines.append('    vlines,')
+        lines.append('    hline{1,Z}={1pt},')
+        lines.append('    row{1}={font=\\bfseries},')
+        lines.append('  }')
+    else:
+        # 大表：用 longtblr 跨页
+        lines.append('\\begin{longtblr}[')
+        lines.append('  entry={none},')
+        lines.append('  label={none},')
+        lines.append(']{')
+        lines.append(f'  width=\\linewidth,')
+        lines.append(f'  colspec={{{colspec}}},')
+        lines.append('  cells={valign=m},')
+        lines.append('  rowhead=1,')
+        lines.append('  hlines,')
+        lines.append('  vlines,')
+        lines.append('  hline{1,Z}={1pt},')
+        lines.append('  row{1}={font=\\bfseries},')
+        lines.append('}')
     
     # 表头
     header_cells = [escape_tex(str(cell)) for cell in rows[0]]
@@ -191,8 +209,6 @@ def generate_table_tex(rows):
     # 数据行
     for r in range(1, len(rows)):
         row = rows[r]
-        if use_rowspan_pagebreak and row_starts_large_span(merge_info, r, cols):
-            lines.append('  \\pagebreak[3]')
         cells = []
         for c in range(cols):
             info = merge_info[r][c]
@@ -206,7 +222,12 @@ def generate_table_tex(rows):
                 cells.append(escape_tex(info[1]))
         lines.append(f'  {" & ".join(cells)} \\\\')
     
-    lines.append('\\end{longtblr}')
+    if is_small_table:
+        lines.append('  \\end{tblr}')
+        lines.append('\\end{table}')
+    else:
+        lines.append('\\end{longtblr}')
+    
     lines.append('')
     
     return '\n'.join(lines)
