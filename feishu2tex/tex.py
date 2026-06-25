@@ -109,7 +109,7 @@ def generate_tex(blocks):
             if local_path:
                 lines.append('\\begin{figure}[htbp]')
                 lines.append('  \\centering')
-                lines.append(f'  \\includegraphics[width=0.8\\textwidth]{{{local_path}}}')
+                lines.append(f'  \\includegraphics[width=\\textwidth, height=0.7\\textheight, keepaspectratio]{{{local_path}}}')
                 if alt:
                     lines.append(f'  \\caption{{{escape_tex(alt)}}}')
                 lines.append('\\end{figure}')
@@ -237,6 +237,15 @@ def generate_style_file():
 }
 
 \setlist{noitemsep, topsep=0pt}
+
+% 浮动体参数优化：减少图片跳页
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.85}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
 
 % 表格样式：垂直居中 + 左对齐
 \newcolumntype{X}{>{\RaggedRight\arraybackslash}m{\hsize}}
