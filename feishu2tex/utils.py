@@ -28,6 +28,25 @@ def escape_tex(text):
     text = text.replace('≥', '$\\geq$')
     text = text.replace('＜', '$<$')
     text = text.replace('＞', '$>$')
+    # 处理特殊符号
+    text = text.replace('★', '$\\bigstar$')
+    text = text.replace('☆', '$\\bigstar$')
+    text = text.replace('●', '$\\bullet$')
+    text = text.replace('○', '$\\circ$')
+    text = text.replace('■', '$\\blacksquare$')
+    text = text.replace('□', '$\\square$')
+    text = text.replace('▲', '$\\blacktriangle$')
+    text = text.replace('△', '$\\triangle$')
+    text = text.replace('◆', '$\\blacklozenge$')
+    text = text.replace('◇', '$\\lozenge$')
+    text = text.replace('→', '$\\rightarrow$')
+    text = text.replace('←', '$\\leftarrow$')
+    text = text.replace('↑', '$\\uparrow$')
+    text = text.replace('↓', '$\\downarrow$')
+    text = text.replace('↔', '$\\leftrightarrow$')
+    text = text.replace('⇒', '$\\Rightarrow$')
+    text = text.replace('⇐', '$\\Leftarrow$')
+    text = text.replace('⇔', '$\\Leftrightarrow$')
     # 处理特殊字符
     special_chars = {
         '&': '\\&',
