@@ -7,8 +7,9 @@ from urllib.parse import urlparse
 def strip_heading_number(text):
     """去掉标题开头的数字序号，如 '1.1 xxx' -> 'xxx', '2.' -> '2'"""
     # 匹配开头的数字序号: 1. / 1.1 / 1.1.1 / 1.1.1.1 等
-    m = re.match(r'^([\d]+(\.[\d]+)*\.?)\s*', text)
-    if m:
+    # 排除十六进制数（如 0x27）和版本号（如 v2.0）
+    m = re.match(r'^([\d]+(\.[\d]+)*\.?)\s*(?![xX\d])', text)
+    if m and m.group(1):
         rest = text[m.end():].strip()
         # 如果去掉序号后为空，保留数字部分（去掉末尾的点）
         if not rest:

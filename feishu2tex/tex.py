@@ -45,12 +45,12 @@ def generate_tex(blocks, section_heading=None):
         
         elif block_type == 'heading':
             level = block.get('level', 1)
-            cmd = ['section', 'subsection', 'subsubsection', 
-                   'paragraph', 'subparagraph', 'subparagraph'][min(level - 1, 5)]
+            cmd = ['chapter', 'section', 'subsection', 'subsubsection', 
+                   'paragraph', 'subparagraph'][min(level - 1, 5)]
             heading_text = escape_tex(strip_heading_number(block["content"]))
             if heading_text:
-                # 在 section 前用 cleardoublepage（奇数页开始）
-                if level <= 2:
+                # 在 chapter 前用 cleardoublepage（奇数页开始）
+                if level == 1:
                     lines.append('\\cleardoublepage')
                 lines.append(f'\\{cmd}{{{heading_text}}}')
                 lines.append('')
@@ -64,6 +64,9 @@ def generate_tex(blocks, section_heading=None):
                     table_count = 0
         
         elif block_type == 'paragraph':
+            # 跳过已用作表格 caption 的段落
+            if block.get('used'):
+                continue
             lines.append(block['content'])
             lines.append('')
         
@@ -93,6 +96,10 @@ def generate_tex(blocks, section_heading=None):
             caption = block.get('caption', '')
             # 只保留安全字符作为语言名
             safe_lang = re.sub(r'[^a-zA-Z0-9#+-]', '', lang) if lang else ''
+            # listings 不支持的语言设为空
+            unsupported = ['plaintext', 'text', 'plain']
+            if safe_lang.lower() in unsupported:
+                safe_lang = ''
             if caption:
                 lines.append(f'\\begin{{lstlisting}}[language={safe_lang}, caption={{{escape_tex(caption)}}}]')
             else:
@@ -120,7 +127,7 @@ def generate_tex(blocks, section_heading=None):
             alt = block.get('alt', '')
             local_path = block.get('local_path', '')
             if local_path:
-                lines.append('\\begin{figure}[htbp]')
+                lines.append('\\begin{figure}[hbtp]')
                 lines.append('  \\centering')
                 lines.append(f'  \\includegraphics[width=\\textwidth, height=0.7\\textheight, keepaspectratio]{{{local_path}}}')
                 # 有真实 caption 时保留，否则留空让 LaTeX 自动编号
@@ -137,8 +144,10 @@ def generate_tex(blocks, section_heading=None):
             rows = block.get('rows', [])
             if rows:
                 table_count += 1
-                # 生成 caption: 章节序号 + 表编号
-                if current_section_num:
+                # 使用表格自带的 caption，如果没有则自动生成
+                if 'caption' in block:
+                    caption = block['caption']
+                elif current_section_num:
                     caption = f'{current_section_num} 表{table_count}'
                 else:
                     caption = f'表{table_count}'
@@ -150,6 +159,10 @@ def generate_tex(blocks, section_heading=None):
             lines.append('\\end{enumerate}')
         else:
             lines.append('\\end{itemize}')
+    
+    # 在章节末尾插入 FloatBarrier，阻止表格跨章节浮动
+    lines.append('')
+    lines.append('\\FloatBarrier')
     
     return '\n'.join(lines)
 
@@ -300,6 +313,9 @@ def generate_style_file():
 \RequirePackage{longtable}
 \RequirePackage{tcolorbox}
 \RequirePackage{tabularray}
+\RequirePackage{float}
+\RequirePackage{placeins}
+\RequirePackage{adjustbox}
 \RequirePackage{needspace}
 \UseTblrLibrary{booktabs}
 
@@ -335,6 +351,12 @@ def generate_style_file():
 
 % 表格样式：垂直居中 + 左对齐
 \newcolumntype{X}{>{\RaggedRight\arraybackslash}m{\hsize}}
+
+% chapter 标题样式：减少顶部间距
+\ctexset{
+  chapter/beforeskip=-10pt,
+  chapter/afterskip=30pt,
+}
 
 """ + generate_callout_style()
 

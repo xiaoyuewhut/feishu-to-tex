@@ -49,7 +49,7 @@ def create_project(blocks, title, doc_id, output_dir):
     
     # 获取电子表格数据
     sheet_cache = {}
-    for block in blocks:
+    for i, block in enumerate(blocks):
         if block.get('type') == 'sheet':
             token = block.get('token')
             sheet_id = block.get('sheet_id')
@@ -65,6 +65,19 @@ def create_project(blocks, title, doc_id, output_dir):
             if sheet_data:
                 block['rows'] = sheet_data
                 block['type'] = 'table'
+                
+                # 检查前面的段落是否是表格 caption
+                if i > 0:
+                    prev_block = blocks[i-1]
+                    if prev_block.get('type') == 'paragraph':
+                        content = prev_block.get('content', '')
+                        # 检查是否是加粗文本（\textbf{...}）
+                        if content.startswith('\\textbf{') and content.endswith('}'):
+                            # 提取 caption 文本
+                            caption = content[8:-1]  # 去掉 \textbf{ 和 }
+                            block['caption'] = caption
+                            # 标记前面的段落已使用
+                            prev_block['used'] = True
             else:
                 warnings.append(f'表格获取失败: {sheet_id}')
                 block['type'] = 'paragraph'

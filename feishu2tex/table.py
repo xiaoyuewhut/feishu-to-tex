@@ -79,7 +79,7 @@ def trim_empty_tail_cols(rows):
 
 
 def calc_merge_info(rows, cols):
-    """计算合并单元格信息（指标-权重成对合并）"""
+    """计算合并单元格信息"""
     merge_info = [[None for _ in range(cols)] for _ in range(len(rows))]
     
     def cell_val(r, c):
@@ -98,31 +98,11 @@ def calc_merge_info(rows, cols):
             
             # 计算向下合并的行数
             span = 1
-            
-            # 权重列（奇数列）只能跟随对应指标列的合并范围
-            if c % 2 == 1:
-                indicator_col = c - 1  # 对应的指标列
-                # 找到指标列在当前行的合并范围
-                indicator_span = 1
-                while r + indicator_span < len(rows):
-                    if cell_val(r + indicator_span, indicator_col) == '':
-                        indicator_span += 1
-                    else:
-                        break
-                
-                # 权重列的合并范围不能超过指标列
-                while r + span < len(rows) and span < indicator_span:
-                    if cell_val(r + span, c) == '':
-                        span += 1
-                    else:
-                        break
-            else:
-                # 指标列（偶数列）正常合并
-                while r + span < len(rows):
-                    if cell_val(r + span, c) == '':
-                        span += 1
-                    else:
-                        break
+            while r + span < len(rows):
+                if cell_val(r + span, c) == '':
+                    span += 1
+                else:
+                    break
             
             if span > 1:
                 merge_info[r][c] = (span, cell_val(r, c))
@@ -165,16 +145,60 @@ def generate_table_tex(rows, caption=None):
     # 计算合并信息
     merge_info = calc_merge_info(rows, cols)
     
-    # 判断表格大小：小表用浮动体，大表用longtblr跨页
+    # 判断表格大小：考虑行数和内容长度
     SMALL_TABLE_MAX_ROWS = 25
-    is_small_table = len(rows) <= SMALL_TABLE_MAX_ROWS
+    row_count = len(rows)
+    
+    # 计算内容总长度（用于判断是否需要跨页）
+    total_content_length = 0
+    for r in range(row_count):
+        for c in range(cols):
+            cell = str(rows[r][c]) if c < len(rows[r]) else ''
+            total_content_length += len(cell)
+    
+    # 估算每行平均高度（中文字符约 2 个单位，其他 1 个单位）
+    avg_chars_per_row = total_content_length / max(row_count - 1, 1)  # 减去表头
+    
+    # 判断是否需要跨页：
+    # 1. 行数超过阈值
+    # 2. 或者内容很长（平均每行超过 100 个字符）
+    # 3. 或者有大量合并单元格（跨行合并超过 5 个）
+    large_rowspan_count = 0
+    for r in range(row_count):
+        for c in range(cols):
+            info = merge_info[r][c]
+            if info and info[0] >= 5:
+                large_rowspan_count += 1
+    
+    needs_pagebreak = (
+        row_count > SMALL_TABLE_MAX_ROWS or
+        avg_chars_per_row > 100 or
+        large_rowspan_count > 8
+    )
     
     lines.append('\\small')
     
-    if is_small_table:
-        # 小表：用普通 tblr + [htbp] 浮动定位，不拆页
-        lines.append('\\begin{table}[htbp]')
-        lines.append('  \\centering')
+    if not needs_pagebreak:
+        # 小表：不使用浮动体，直接固定在当前位置
+        # 使用 adjustbox 的 max height 让表格自适应页面空间
+        # 根据行数动态调整缩放比例：行数越多缩放越激进
+        if row_count <= 6:
+            max_height = '0.7\\textheight'
+        elif row_count <= 10:
+            max_height = '0.55\\textheight'
+        elif row_count <= 14:
+            max_height = '0.4\\textheight'
+        elif row_count <= 18:
+            max_height = '0.3\\textheight'
+        else:
+            max_height = '0.25\\textheight'
+        
+        lines.append('\\vspace{0.5em}')
+        lines.append('\\noindent\\begin{minipage}{\\linewidth}')
+        lines.append('\\centering')
+        if caption:
+            lines.append(f'\\textbf{{{escape_tex(caption)}}}\\\\[0.5em]')
+        lines.append(f'\\begin{{adjustbox}}{{max height={max_height}, center}}')
         lines.append(f'  \\begin{{tblr}}{{')
         lines.append(f'    width=\\linewidth,')
         lines.append(f'    colspec={{{colspec}}},')
@@ -187,6 +211,8 @@ def generate_table_tex(rows, caption=None):
     else:
         # 大表：用 longtblr 跨页
         lines.append('\\begin{longtblr}[')
+        if caption:
+            lines.append(f'  caption={{{escape_tex(caption)}}},')
         lines.append('  entry={none},')
         lines.append('  label={none},')
         lines.append(']{')
@@ -197,7 +223,7 @@ def generate_table_tex(rows, caption=None):
         lines.append('  hlines,')
         lines.append('  vlines,')
         lines.append('  hline{1,Z}={1pt},')
-        lines.append('  row{1}={font=\\bfseries},')
+        lines.append('    row{1}={font=\\bfseries},')
         lines.append('}')
     
     # 表头
@@ -220,14 +246,12 @@ def generate_table_tex(rows, caption=None):
                 cells.append(escape_tex(info[1]))
         lines.append(f'  {" & ".join(cells)} \\\\')
     
-    if is_small_table:
+    if not needs_pagebreak:
         lines.append('  \\end{tblr}')
-        if caption:
-            lines.append(f'  \\caption{{{escape_tex(caption)}}}')
-        lines.append('\\end{table}')
+        lines.append('  \\end{adjustbox}')
+        lines.append('\\end{minipage}')
+        lines.append('\\vspace{0.5em}')
     else:
-        if caption:
-            lines.append(f'  \\caption{{{escape_tex(caption)}}}')
         lines.append('\\end{longtblr}')
     
     lines.append('')
