@@ -6,6 +6,7 @@ import re
 import xml.etree.ElementTree as ET
 
 from .utils import escape_tex
+from .latex import parse_latex
 
 
 def run_lark_cli(url):
@@ -270,16 +271,7 @@ def get_rich_text(elem):
             href = child.get('href', '')
             parts.append(f'\\href{{{href}}}{{{child_text}}}')
         elif tag == 'latex':
-            latex_content = child.text or ''
-            # 去掉 <br/> 标签
-            latex_content = latex_content.replace('<br/>', '').replace('<br>', '')
-            # 把中文字符用 \text{} 包裹
-            latex_content = re.sub(
-                r'([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]+)',
-                r'\\text{\1}',
-                latex_content
-            )
-            parts.append(f'${latex_content}$')
+            parts.append(parse_latex(child))
         elif tag == 'span':
             text_color = child.get('text-color', '')
             if text_color:
