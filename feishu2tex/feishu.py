@@ -167,35 +167,69 @@ def parse_element(elem):
 
 
 def parse_table(table_elem):
-    """解析表格"""
+    """解析表格，处理 rowspan/colspan 合并"""
     rows = []
     
-    # 处理 thead
+    # 计算列数（从 colgroup 获取）
+    colgroup = table_elem.find('colgroup')
+    num_cols = len(colgroup.findall('col')) if colgroup is not None else 0
+    
+    # 收集所有行
+    all_trs = []
     thead = table_elem.find('thead')
     if thead is not None:
-        for tr in thead.findall('tr'):
-            row = []
-            for th in tr.findall('th'):
-                row.append(get_text(th))
-            rows.append(row)
-    
-    # 处理 tbody
+        all_trs.extend(thead.findall('tr'))
     tbody = table_elem.find('tbody')
     if tbody is not None:
-        for tr in tbody.findall('tr'):
-            row = []
-            for td in tr.findall('td'):
-                row.append(get_text(td))
-            rows.append(row)
+        all_trs.extend(tbody.findall('tr'))
+    if not all_trs:
+        all_trs = table_elem.findall('tr')
     
-    # 如果没有 thead/tbody，直接处理 tr
-    if not rows:
-        for tr in table_elem.findall('tr'):
-            row = []
-            for cell in tr:
-                if cell.tag in ('th', 'td'):
-                    row.append(get_text(cell))
-            rows.append(row)
+    # 处理 rowspan：记录需要填充的空位
+    # pending[row][col] = 剩余需要跳过的行数
+    pending = {}
+    
+    for tr in all_trs:
+        row = []
+        col_idx = 0
+        
+        for cell in tr:
+            if cell.tag not in ('th', 'td'):
+                continue
+            
+            # 跳过被 rowspan 占用的列
+            while col_idx in pending and pending[col_idx] > 0:
+                row.append('')
+                pending[col_idx] -= 1
+                if pending[col_idx] == 0:
+                    del pending[col_idx]
+                col_idx += 1
+            
+            # 获取 rowspan
+            rowspan = int(cell.get('rowspan', '1'))
+            
+            # 添加单元格内容
+            row.append(get_text(cell))
+            
+            # 如果 rowspan > 1，记录需要跳过的行数
+            if rowspan > 1:
+                pending[col_idx] = rowspan - 1
+            
+            col_idx += 1
+        
+        # 填充剩余被 rowspan 占用的列
+        while col_idx in pending and pending[col_idx] > 0:
+            row.append('')
+            pending[col_idx] -= 1
+            if pending[col_idx] == 0:
+                del pending[col_idx]
+            col_idx += 1
+        
+        # 补齐到固定列数
+        while num_cols > 0 and len(row) < num_cols:
+            row.append('')
+        
+        rows.append(row)
     
     return {'type': 'table', 'rows': rows}
 
