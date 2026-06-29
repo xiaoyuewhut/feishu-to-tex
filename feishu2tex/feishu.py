@@ -16,7 +16,7 @@ def run_lark_cli(url):
         '--api-version', 'v2',
         '--doc', url,
         '--doc-format', 'xml',
-        '--detail', 'simple',
+        '--detail', 'with-ids',
         '--format', 'json'
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -107,7 +107,11 @@ def parse_element(elem):
     if tag == 'p':
         content = get_rich_text(elem)
         if content.strip():
-            return {'type': 'paragraph', 'content': content}
+            block = {'type': 'paragraph', 'content': content}
+            align = elem.get('align', '')
+            if align:
+                block['align'] = align
+            return block
         return None
     
     if tag == 'ul':

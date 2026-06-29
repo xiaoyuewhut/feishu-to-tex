@@ -67,16 +67,23 @@ def create_project(blocks, title, doc_id, output_dir):
                 block['type'] = 'table'
                 
                 # 检查前面的段落是否是表格 caption
+                # 支持两种格式：
+                # 1. 居中段落（<p align="center">）
+                # 2. 加粗文本（\textbf{...}）
                 if i > 0:
                     prev_block = blocks[i-1]
                     if prev_block.get('type') == 'paragraph':
                         content = prev_block.get('content', '')
-                        # 检查是否是加粗文本（\textbf{...}）
-                        if content.startswith('\\textbf{') and content.endswith('}'):
-                            # 提取 caption 文本
-                            caption = content[8:-1]  # 去掉 \textbf{ 和 }
+                        align = prev_block.get('align', '')
+                        caption = None
+                        # 居中段落 → 直接作为 caption
+                        if align == 'center':
+                            caption = content.strip()
+                        # 加粗文本 → 提取 \textbf{...} 内容
+                        elif content.startswith('\\textbf{') and content.endswith('}'):
+                            caption = content[8:-1]
+                        if caption:
                             block['caption'] = caption
-                            # 标记前面的段落已使用
                             prev_block['used'] = True
             else:
                 warnings.append(f'表格获取失败: {sheet_id}')
