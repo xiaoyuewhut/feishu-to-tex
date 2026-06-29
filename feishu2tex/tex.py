@@ -201,23 +201,64 @@ def generate_main_tex(title, sections):
         '',
         '\\begin{document}',
         '',
-        '% ===== 封面 =====',
+        '% ===== 封面：经典书卷风格 =====',
         '\\begin{titlepage}',
         '  \\thispagestyle{empty}',
         '  \\begin{tikzpicture}[remember picture, overlay]',
-        '    % 顶部装饰条',
-        '    \\fill[gray!40] (current page.north west) rectangle ([yshift=-4cm]current page.north east);',
-        '    \\fill[gray!60] ([yshift=-4cm]current page.north west) rectangle ([yshift=-4.3cm]current page.north east);',
-        '    % 底部装饰条',
-        '    \\fill[gray!40] (current page.south west) rectangle ([yshift=2cm]current page.south east);',
-        '    \\fill[gray!60] ([yshift=2cm]current page.south west) rectangle ([yshift=2.3cm]current page.south east);',
-        '    % 侧边装饰线',
-        '    \\fill[gray!30] ([xshift=2cm]current page.north west) rectangle ([xshift=2.15cm]current page.south west);',
-        '    \\fill[gray!30] ([xshift=-2cm]current page.north east) rectangle ([xshift=-2.15cm]current page.south east);',
-        '    % 标题（在顶部装饰条内）',
-        '    \\node[anchor=center, text=white, font=\\Huge\\bfseries] at ([yshift=-2cm]current page.north) {\\parbox{0.85\\textwidth}{\\centering ' + escape_tex(title) + '}};',
-        '    % 日期',
-        '    \\node[anchor=center, text=gray!70!white, font=\\Large] at ([yshift=1cm]current page.center) {\\today};',
+        '',
+        '    % ---- 色彩定义 ----',
+        '    \\definecolor{coverframe}{RGB}{90,65,40}',
+        '    \\definecolor{covergold}{RGB}{175,135,95}',
+        '    \\definecolor{covercream}{RGB}{252,248,240}',
+        '',
+        '    % ---- 底色 ----',
+        '    \\fill[covercream] (current page.south west) rectangle (current page.north east);',
+        '',
+        '    % ---- 双线框 ----',
+        '    \\draw[coverframe, line width=0.8pt]',
+        '      ([shift={(-1.6cm,-1.6cm)}]current page.north east) rectangle',
+        '      ([shift={(1.6cm,1.6cm)}]current page.south west);',
+        '    \\draw[coverframe, line width=0.3pt]',
+        '      ([shift={(-1.85cm,-1.85cm)}]current page.north east) rectangle',
+        '      ([shift={(1.85cm,1.85cm)}]current page.south west);',
+        '',
+        '    % ---- 左侧竖线装饰 ----',
+        '    \\fill[covergold!50]',
+        '      ([shift={(2.2cm,2.2cm)}]current page.south west) rectangle',
+        '      ([shift={(2.35cm,-2.2cm)}]current page.north west);',
+        '',
+        '    % ---- 竖线装饰菱形（上） ----',
+        '    \\fill[covergold!70, draw=coverframe, line width=0.4pt]',
+        '      ([shift={(2.275cm,-2.8cm)}]current page.north west)',
+        '      ++(0,4.5pt) -- ++(4.5pt,-4.5pt) -- ++(-4.5pt,-4.5pt) -- ++(-4.5pt,4.5pt) -- cycle;',
+        '',
+        '    % ---- 竖线装饰菱形（下） ----',
+        '    \\fill[covergold!70, draw=coverframe, line width=0.4pt]',
+        '      ([shift={(2.275cm,2.8cm)}]current page.south west)',
+        '      ++(0,4.5pt) -- ++(4.5pt,-4.5pt) -- ++(-4.5pt,-4.5pt) -- ++(-4.5pt,4.5pt) -- cycle;',
+        '',
+        '    % ---- 标题 ----',
+        '    \\node[anchor=north, font=\\Huge\\bfseries,',
+        '          text=coverframe,',
+        '          align=center, text width=0.7\\textwidth]',
+        '      at ([shift={(0.5cm,-4cm)}]current page.north)',
+        f'      {{\\parbox{{0.72\\textwidth}}{{\\centering {escape_tex(title)}}}}};',
+        '',
+        '    % ---- 标题下方装饰线 ----',
+        '    \\draw[covergold, line width=0.5pt]',
+        '      ([shift={(-3.5cm,1.2cm)}]current page.center) --',
+        '      ([shift={(3.5cm,1.2cm)}]current page.center);',
+        '',
+        '    % ---- 装饰线中央菱形 ----',
+        '    \\fill[covergold!80, draw=coverframe, line width=0.4pt]',
+        '      ([shift={(0,1.2cm)}]current page.center)',
+        '      ++(0,4.5pt) -- ++(4.5pt,-4.5pt) -- ++(-4.5pt,-4.5pt) -- ++(-4.5pt,4.5pt) -- cycle;',
+        '',
+        '    % ---- 日期 ----',
+        '    \\node[anchor=south, font=\\large\\itshape,',
+        '          text=coverframe!60]',
+        '      at ([shift={(0.5cm,2.2cm)}]current page.south) {\\today};',
+        '',
         '  \\end{tikzpicture}',
         '\\end{titlepage}',
         '',
@@ -261,19 +302,55 @@ def generate_main_tex(title, sections):
         lines.append(f'\\input{{sections/{num}-{name}}}')
         lines.append('')
     
-    # ===== 封底 =====
+    # ===== 封底：经典书卷风格 =====
     lines.append('% ===== 封底 =====')
     lines.append('\\cleardoublepage')
     lines.append('\\thispagestyle{empty}')
     lines.append('\\begin{tikzpicture}[remember picture, overlay]')
-    lines.append('  % 顶部装饰条')
-    lines.append('  \\fill[gray!40] (current page.north west) rectangle ([yshift=-3cm]current page.north east);')
-    lines.append('  \\fill[gray!60] ([yshift=-3cm]current page.north west) rectangle ([yshift=-3.3cm]current page.north east);')
-    lines.append('  % 底部装饰条')
-    lines.append('  \\fill[gray!40] (current page.south west) rectangle ([yshift=2cm]current page.south east);')
-    lines.append('  \\fill[gray!60] ([yshift=2cm]current page.south west) rectangle ([yshift=2.3cm]current page.south east);')
-    lines.append('  % 标题')
-    lines.append('  \\node[anchor=center, text=white, font=\\Huge\\bfseries] at (current page.center) {\\parbox{0.85\\textwidth}{\\centering ' + escape_tex(title) + '}};')
+    lines.append('')
+    lines.append('  % ---- 色彩定义 ----')
+    lines.append('  \\definecolor{backframe}{RGB}{90,65,40}')
+    lines.append('  \\definecolor{backgold}{RGB}{175,135,95}')
+    lines.append('  \\definecolor{backcream}{RGB}{252,248,240}')
+    lines.append('')
+    lines.append('  % ---- 底色 ----')
+    lines.append('  \\fill[backcream] (current page.south west) rectangle (current page.north east);')
+    lines.append('')
+    lines.append('  % ---- 双线框 ----')
+    lines.append('  \\draw[backframe, line width=0.8pt]')
+    lines.append('    ([shift={(-1.6cm,-1.6cm)}]current page.north east) rectangle')
+    lines.append('    ([shift={(1.6cm,1.6cm)}]current page.south west);')
+    lines.append('  \\draw[backframe, line width=0.3pt]')
+    lines.append('    ([shift={(-1.85cm,-1.85cm)}]current page.north east) rectangle')
+    lines.append('    ([shift={(1.85cm,1.85cm)}]current page.south west);')
+    lines.append('')
+    lines.append('  % ---- 左侧竖线装饰 ----')
+    lines.append('  \\fill[backgold!50]')
+    lines.append('    ([shift={(2.2cm,2.2cm)}]current page.south west) rectangle')
+    lines.append('    ([shift={(2.35cm,-2.2cm)}]current page.north west);')
+    lines.append('')
+    lines.append('  % ---- 中央装饰菱形 ----')
+    lines.append('  \\fill[backgold!60, draw=backframe, line width=0.4pt]')
+    lines.append('    ([shift={(0.5cm,0)}]current page.center)')
+    lines.append('    ++(0,6pt) -- ++(6pt,-6pt) -- ++(-6pt,-6pt) -- ++(-6pt,6pt) -- cycle;')
+    lines.append('')
+    lines.append('  % ---- 标题（小号，居中） ----')
+    lines.append('  \\node[anchor=south, font=\\Large\\bfseries,')
+    lines.append('        text=backframe!70,')
+    lines.append('        align=center, text width=0.65\\textwidth]')
+    lines.append(f'    at ([shift={{(0.5cm,4cm)}}]current page.center)')
+    lines.append(f'    {{\\parbox{{0.67\\textwidth}}{{\\centering {escape_tex(title)}}}}};')
+    lines.append('')
+    lines.append('  % ---- 标题上方装饰线 ----')
+    lines.append('  \\draw[backgold, line width=0.4pt]')
+    lines.append('    ([shift={(-2.5cm,5.5cm)}]current page.center) --')
+    lines.append('    ([shift={(2.5cm,5.5cm)}]current page.center);')
+    lines.append('')
+    lines.append('  % ---- 装饰线中央小菱形 ----')
+    lines.append('  \\fill[backgold!70, draw=backframe, line width=0.3pt]')
+    lines.append('    ([shift={(0,5.5cm)}]current page.center)')
+    lines.append('    ++(0,4pt) -- ++(4pt,-4pt) -- ++(-4pt,-4pt) -- ++(-4pt,4pt) -- cycle;')
+    lines.append('')
     lines.append('\\end{tikzpicture}')
     lines.append('')
     lines.append('\\end{document}')
