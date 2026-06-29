@@ -4,6 +4,7 @@ import re
 
 from .utils import escape_tex, strip_heading_number, sanitize_ascii
 from .table import generate_table_tex
+from .image import generate_image_tex
 
 
 def generate_tex(blocks, section_heading=None):
@@ -13,8 +14,6 @@ def generate_tex(blocks, section_heading=None):
     image_count = 0
     table_count = 0
     current_section_num = None
-    
-    import re
     
     for i, block in enumerate(blocks):
         block_type = block.get('type')
@@ -127,15 +126,8 @@ def generate_tex(blocks, section_heading=None):
             alt = block.get('alt', '')
             local_path = block.get('local_path', '')
             if local_path:
-                lines.append('\\begin{figure}[hbtp]')
-                lines.append('  \\centering')
-                lines.append(f'  \\includegraphics[width=\\textwidth, height=0.7\\textheight, keepaspectratio]{{{local_path}}}')
-                # 有真实 caption 时保留，否则留空让 LaTeX 自动编号
-                if alt and not re.match(r'^(paste|image|img|图片|截图|Pasted image).*$', alt, re.IGNORECASE):
-                    lines.append(f'  \\caption{{{escape_tex(alt)}}}')
-                else:
-                    lines.append('  \\caption{}')
-                lines.append('\\end{figure}')
+                image_count += 1
+                lines.extend(generate_image_tex(local_path, alt, image_count))
             elif src:
                 lines.append(f'% [图片: {alt or src}]')
             lines.append('')
@@ -340,13 +332,13 @@ def generate_style_file():
 
 \setlist{noitemsep, topsep=0pt}
 
-% 浮动体参数优化：减少图片跳页
-\renewcommand{\topfraction}{0.9}
-\renewcommand{\bottomfraction}{0.8}
+% 浮动体参数优化：底部优先于顶部（与图片 minipage 策略一致）
+\renewcommand{\topfraction}{0.7}
+\renewcommand{\bottomfraction}{0.9}
 \renewcommand{\textfraction}{0.07}
 \renewcommand{\floatpagefraction}{0.85}
-\setcounter{topnumber}{3}
-\setcounter{bottomnumber}{2}
+\setcounter{topnumber}{2}
+\setcounter{bottomnumber}{3}
 \setcounter{totalnumber}{5}
 
 % 表格样式：垂直居中 + 左对齐
