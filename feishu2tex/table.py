@@ -3,10 +3,6 @@
 from .utils import escape_tex
 
 
-ROWSPAN_PAGEBREAK_THRESHOLD = 6
-MIN_ROWS_FOR_ROWSPAN_PAGEBREAK = 24
-
-
 def cell_text(row, col):
     """取单元格文本，越界视为空。"""
     if col >= len(row):
@@ -16,9 +12,20 @@ def cell_text(row, col):
 
 def calc_col_weights(rows, cols):
     """根据内容计算每列权重（用于 tabularray 的 X 列）"""
+    # 字符宽度：中文/日文/韩文/全角符号计 2 个单位，其他计 1
+    def _is_wide_char(ch):
+        cp = ord(ch)
+        return (0x1100 <= cp <= 0x115F or  # Hangul Jamo
+                0x2E80 <= cp <= 0xA4CF or  # CJK Radicals Supplement .. Yi
+                0xAC00 <= cp <= 0xD7A3 or  # Hangul Syllables
+                0xF900 <= cp <= 0xFAFF or  # CJK Compatibility Ideographs
+                0xFE30 <= cp <= 0xFE6F or  # CJK Compatibility Forms
+                0xFF00 <= cp <= 0xFFEF or  # Halfwidth/Fullwidth Forms
+                0x20000 <= cp <= 0x2FA1F)   # CJK Extension B .. F
+
     def char_width(ch):
-        if '\u4e00' <= ch <= '\u9fff':
-            return 2  # 中文字符
+        if _is_wide_char(ch):
+            return 2
         return 1
     
     def text_width(text):
@@ -59,8 +66,10 @@ def calc_col_weights(rows, cols):
         
         col_weights.append(max(header_w, max_w, 1))
     
-    # 归一化为整数权重（最小1）
-    min_w = min(col_weights)
+    # 归一化为整数权重（最小 1）
+    min_w = min(col_weights) if col_weights else 1
+    if min_w <= 0:
+        min_w = 1
     col_weights = [max(1, round(w / min_w)) for w in col_weights]
     
     return col_weights
@@ -116,18 +125,9 @@ def calc_merge_info(rows, cols):
     return merge_info
 
 
-def row_starts_large_span(merge_info, row_index, cols):
-    """判断当前行是否开始了较大的纵向合并块。"""
-    for c in range(cols):
-        info = merge_info[row_index][c]
-        if info and info[0] >= ROWSPAN_PAGEBREAK_THRESHOLD:
-            return True
-    return False
-
-
 def should_hint_rowspan_pagebreak(rows):
     """短表通常能整体放下，不需要给 rowspan 额外分页提示。"""
-    return len(rows) >= MIN_ROWS_FOR_ROWSPAN_PAGEBREAK
+    return len(rows) >= 24
 
 
 def generate_table_tex(rows, caption=None):

@@ -5,6 +5,7 @@ import re
 from .utils import escape_tex, strip_heading_number, sanitize_ascii
 from .table import generate_table_tex
 from .image import generate_image_tex
+from .callout import generate_callout_tex
 
 
 def generate_tex(blocks, section_heading=None):
@@ -45,7 +46,7 @@ def generate_tex(blocks, section_heading=None):
         elif block_type == 'heading':
             level = block.get('level', 1)
             cmd = ['chapter', 'section', 'subsection', 'subsubsection', 
-                   'paragraph', 'subparagraph'][min(level - 1, 5)]
+                   'paragraph', 'subparagraph'][max(0, min(level - 1, 5))]
             heading_text = escape_tex(strip_heading_number(block["content"]))
             if heading_text:
                 # 在 chapter 前用 cleardoublepage（奇数页开始）
@@ -114,7 +115,6 @@ def generate_tex(blocks, section_heading=None):
             lines.append('')
         
         elif block_type == 'callout':
-            from .callout import generate_callout_tex
             lines.extend(generate_callout_tex(block))
         
         elif block_type == 'divider':
@@ -138,7 +138,7 @@ def generate_tex(blocks, section_heading=None):
                 table_count += 1
                 # 使用表格自带的 caption，如果没有则自动生成
                 if 'caption' in block:
-                    caption = block['caption']
+                    caption = escape_tex(block['caption'])
                 elif current_section_num:
                     caption = f'{current_section_num} 表{table_count}'
                 else:

@@ -8,6 +8,12 @@ import xml.etree.ElementTree as ET
 from .utils import escape_tex
 from .latex import parse_latex
 
+# lark-cli 超时时间（秒）
+CLI_TIMEOUT = 60
+# 电子表格最大范围
+SHEET_MAX_ROWS = 100
+SHEET_MAX_COLS = 26
+
 
 def run_lark_cli(url):
     """调用 lark-cli 获取文档内容"""
@@ -19,7 +25,7 @@ def run_lark_cli(url):
         '--detail', 'with-ids',
         '--format', 'json'
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=CLI_TIMEOUT)
     if result.returncode != 0:
         raise Exception(f'lark-cli 调用失败: {result.stderr}')
     return json.loads(result.stdout)
@@ -34,27 +40,27 @@ def extract_doc_info(response):
 
 
 def fetch_sheet_data(token, sheet_id):
-    """获取电子表格数据"""
+    """获取电子表格数据（最多 {SHEET_MAX_ROWS} 行 x {SHEET_MAX_COLS} 列）"""
     cmd = [
         'lark-cli', 'sheets', '+cells-get',
         '--spreadsheet-token', token,
         '--sheet-id', sheet_id,
-        '--range', 'A1:Z100',
+        '--range', f'A1:{chr(64 + SHEET_MAX_COLS)}{SHEET_MAX_ROWS}',
         '--format', 'json'
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=CLI_TIMEOUT)
     if result.returncode != 0:
         return None
-    
+
     data = json.loads(result.stdout)
     if not data.get('ok'):
         return None
-    
+
     # 提取单元格值
     ranges = data.get('data', {}).get('ranges', [])
     if not ranges:
         return None
-    
+
     cells = ranges[0].get('cells', [])
     rows = []
     for row in cells:
@@ -62,7 +68,11 @@ def fetch_sheet_data(token, sheet_id):
         # 过滤全空行
         if any(str(v).strip() for v in row_values):
             rows.append(row_values)
-    
+
+    # 警告：如果达到范围上限，数据可能被截断
+    if rows and len(rows) >= SHEET_MAX_ROWS:
+        print(f'  ⚠ 表格 {sheet_id} 行数达到上限 ({SHEET_MAX_ROWS})，数据可能不完整')
+
     return rows if rows else None
 
 
@@ -77,12 +87,12 @@ def parse_xml_content(xml_content):
         root = ET.fromstring(wrapped)
     except ET.ParseError as e:
         print(f'XML 解析错误: {e}')
-        # 尝试修复常见问题
-        xml_content = xml_content.replace('&', '&amp;')
+        # 尝试修复未转义的 & 符号（不破坏已有实体）
+        xml_content = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;|#)', '&amp;', xml_content)
         wrapped = f'<root>{xml_content}</root>'
         try:
             root = ET.fromstring(wrapped)
-        except:
+        except ET.ParseError:
             return blocks
     
     for elem in root:
@@ -102,7 +112,8 @@ def parse_element(elem):
     
     if tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
         level = int(tag[1])
-        return {'type': 'heading', 'level': level, 'content': get_text(elem)}
+        # 使用 get_rich_text 保留富文本格式
+        return {'type': 'heading', 'level': level, 'content': get_rich_text(elem)}
     
     if tag == 'p':
         content = get_rich_text(elem)
@@ -273,12 +284,14 @@ def get_rich_text(elem):
             parts.append(f'\\texttt{{{child_text}}}')
         elif tag == 'a':
             href = child.get('href', '')
-            parts.append(f'\\href{{{href}}}{{{child_text}}}')
+            if child_text:
+                parts.append(f'\\href{{{href}}}{{{child_text}}}')
         elif tag == 'latex':
             parts.append(parse_latex(child))
         elif tag == 'span':
             text_color = child.get('text-color', '')
-            if text_color:
+            if text_color and not text_color.startswith('#'):
+                # 仅支持命名的 xcolor 颜色，跳过 CSS 十六进制值
                 parts.append(f'\\textcolor{{{text_color}}}{{{child_text}}}')
             else:
                 parts.append(child_text)

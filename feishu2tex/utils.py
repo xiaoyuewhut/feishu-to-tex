@@ -1,5 +1,6 @@
 """工具函数"""
 
+import os
 import re
 from urllib.parse import urlparse
 
@@ -112,14 +113,8 @@ def guess_image_ext(url):
     """猜测图片扩展名"""
     parsed = urlparse(url)
     path = parsed.path.lower()
-    if '.png' in path:
-        return '.png'
-    elif '.jpg' in path or '.jpeg' in path:
-        return '.jpg'
-    elif '.gif' in path:
-        return '.gif'
-    elif '.webp' in path:
-        return '.webp'
-    elif '.svg' in path:
-        return '.svg'
+    # 用 os.path.splitext 提取真正的扩展名
+    ext = os.path.splitext(path)[1]
+    if ext in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'):
+        return '.jpg' if ext == '.jpeg' else ext
     return '.png'

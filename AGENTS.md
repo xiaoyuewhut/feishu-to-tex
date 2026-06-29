@@ -61,6 +61,12 @@ xelatex -interaction=nonstopmode main.tex  # 第二次插入目录
 - 无 caption 时留空 `\caption{}`，让 LaTeX 自动编号
 - 有 caption 时保留原样
 
+### 表格 caption 识别 (project.py)
+- 表格/电子表格前的段落如果是**居中**（`align="center"`）或**加粗**（`\textbf{...}`），自动提取为表格 caption
+- 使用后段落被标记为 `used`，不在正文重复渲染
+- 为通用性同时支持内嵌 `<table>` 和 `<sheet>` 两种表格
+- 依赖 `--detail with-ids` 保留 `align` 等样式属性
+
 ### 特殊字符 (utils.py)
 - escape_tex() 处理 TeX 特殊字符和 Unicode 符号（★☆●○→←等）
 - 标题和 icon 都必须经过 escape_tex() 转义

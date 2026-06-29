@@ -15,6 +15,29 @@ from .tex import (
 )
 
 
+def _extract_table_caption(blocks, i, table_block):
+    """提取表格前的段落作为 caption（支持居中段落和加粗文本）
+    
+    如果前一个 block 是符合条件的段落，则将其标记为 used 并将内容
+    写入 table_block['caption']。
+    """
+    if i <= 0:
+        return
+    prev_block = blocks[i - 1]
+    if prev_block.get('type') != 'paragraph':
+        return
+    content = prev_block.get('content', '')
+    align = prev_block.get('align', '')
+    caption = None
+    if align == 'center':
+        caption = content.strip()
+    elif content.startswith('\\textbf{') and content.endswith('}'):
+        caption = content[8:-1]
+    if caption:
+        table_block['caption'] = caption
+        prev_block['used'] = True
+
+
 def create_project(blocks, title, doc_id, output_dir):
     """创建 LaTeX 项目"""
     # 生成文件夹名
@@ -65,30 +88,16 @@ def create_project(blocks, title, doc_id, output_dir):
             if sheet_data:
                 block['rows'] = sheet_data
                 block['type'] = 'table'
-                
-                # 检查前面的段落是否是表格 caption
-                # 支持两种格式：
-                # 1. 居中段落（<p align="center">）
-                # 2. 加粗文本（\textbf{...}）
-                if i > 0:
-                    prev_block = blocks[i-1]
-                    if prev_block.get('type') == 'paragraph':
-                        content = prev_block.get('content', '')
-                        align = prev_block.get('align', '')
-                        caption = None
-                        # 居中段落 → 直接作为 caption
-                        if align == 'center':
-                            caption = content.strip()
-                        # 加粗文本 → 提取 \textbf{...} 内容
-                        elif content.startswith('\\textbf{') and content.endswith('}'):
-                            caption = content[8:-1]
-                        if caption:
-                            block['caption'] = caption
-                            prev_block['used'] = True
+                _extract_table_caption(blocks, i, block)
             else:
                 warnings.append(f'表格获取失败: {sheet_id}')
                 block['type'] = 'paragraph'
                 block['content'] = f'[表格: {sheet_id}]'
+    
+    # 为内嵌表格（非电子表格）也提取 caption
+    for i, block in enumerate(blocks):
+        if block.get('type') == 'table' and 'caption' not in block:
+            _extract_table_caption(blocks, i, block)
     
     # 替换图片引用
     for block in blocks:
