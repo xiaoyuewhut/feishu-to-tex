@@ -2,7 +2,7 @@
 
 import re
 
-from .utils import escape_tex, strip_heading_number, sanitize_ascii
+from .utils import escape_tex, strip_heading_number, strip_heading_tex, sanitize_ascii
 from .table import generate_table_tex
 from .image import generate_image_tex
 from .callout import generate_callout_tex
@@ -47,7 +47,10 @@ def generate_tex(blocks, section_heading=None):
             level = block.get('level', 1)
             cmd = ['chapter', 'section', 'subsection', 'subsubsection', 
                    'paragraph', 'subparagraph'][max(0, min(level - 1, 5))]
-            heading_text = escape_tex(strip_heading_number(block["content"]))
+            # 从 raw 文本剥离序号，映射到 tex 输出
+            raw = block.get('raw_content', block.get('content', ''))
+            tex = block.get('content', raw)
+            heading_text = strip_heading_tex(raw, tex)
             if heading_text:
                 # 在 chapter 前用 cleardoublepage（奇数页开始）
                 if level == 1:
@@ -56,7 +59,7 @@ def generate_tex(blocks, section_heading=None):
                 lines.append('')
             
             # 更新当前章节序号，重置表格计数器
-            m = re.match(r'^([\d]+(\.[\d]+)*\.?)\s*', block["content"])
+            m = re.match(r'^([\d]+(\.[\d]+)*\.?)\s*', raw)
             if m:
                 new_section_num = m.group(1).rstrip('.')
                 if new_section_num != current_section_num:
@@ -138,12 +141,15 @@ def generate_tex(blocks, section_heading=None):
                 table_count += 1
                 # 使用表格自带的 caption，如果没有则自动生成
                 if 'caption' in block:
-                    caption = escape_tex(block['caption'])
+                    caption = block['caption']
+                    caption_is_tex = True
                 elif current_section_num:
                     caption = f'{current_section_num} 表{table_count}'
+                    caption_is_tex = False
                 else:
                     caption = f'表{table_count}'
-                lines.append(generate_table_tex(rows, caption))
+                    caption_is_tex = False
+                lines.append(generate_table_tex(rows, caption, caption_is_tex=caption_is_tex))
     
     # 关闭最后的列表
     if in_list:
@@ -174,7 +180,7 @@ def split_sections(blocks):
                 current = {'heading': None, 'blocks': []}
         
         if current['heading'] is None and block_type == 'heading':
-            current['heading'] = block.get('content')
+            current['heading'] = block.get('raw_content', block.get('content'))
         
         current['blocks'].append(block)
     
@@ -368,6 +374,7 @@ def generate_style_file():
 \RequirePackage{hyperref}
 \RequirePackage{xcolor}
 \RequirePackage{soul}
+\RequirePackage[normalem]{ulem}  % \sout 等删除线命令
 \RequirePackage{listings}
 \RequirePackage{amsmath}
 \RequirePackage{amssymb}

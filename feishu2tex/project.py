@@ -6,7 +6,8 @@ from datetime import datetime
 
 from .utils import (
     sanitize_filename, sanitize_ascii, to_folder_name,
-    strip_heading_number, download_image, guess_image_ext
+    strip_heading_number, download_image, guess_image_ext,
+    is_svg_file, convert_svg_to_png
 )
 from .feishu import fetch_sheet_data
 from .tex import (
@@ -64,7 +65,21 @@ def create_project(blocks, title, doc_id, output_dir):
             filepath = os.path.join(project_dir, 'assets', 'images', filename)
             
             if download_image(block['src'], filepath):
-                image_map[block['src']] = f'assets/images/{filename}'
+                # SVG → PNG 转换（XeLaTeX 不能直接 include SVG）
+                if is_svg_file(filepath):
+                    png_path = convert_svg_to_png(filepath)
+                    if png_path:
+                        # 统一输出为 image-XXX.png
+                        final_path = os.path.join(project_dir, 'assets', 'images', f'image-{num}.png')
+                        if os.path.abspath(png_path) != os.path.abspath(final_path):
+                            os.replace(png_path, final_path)
+                        os.remove(filepath)  # 删除原 SVG
+                        image_map[block['src']] = f'assets/images/image-{num}.png'
+                    else:
+                        warnings.append(f'SVG 转换失败: {block["src"]}')
+                        image_map[block['src']] = f'assets/images/{filename}'
+                else:
+                    image_map[block['src']] = f'assets/images/{filename}'
             else:
                 image_failed += 1
                 warnings.append(f'图片下载失败: {block["src"]}')
@@ -80,8 +95,10 @@ def create_project(blocks, title, doc_id, output_dir):
             
             if cache_key not in sheet_cache:
                 print(f'  获取表格数据: {sheet_id}...')
-                sheet_data = fetch_sheet_data(token, sheet_id)
+                sheet_data, sheet_warnings = fetch_sheet_data(token, sheet_id)
                 sheet_cache[cache_key] = sheet_data
+                if sheet_warnings:
+                    warnings.extend(sheet_warnings)
             else:
                 sheet_data = sheet_cache[cache_key]
             

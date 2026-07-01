@@ -1,13 +1,19 @@
 """表格生成模块"""
 
+from .feishu import TableCell
 from .utils import escape_tex
 
 
 def cell_text(row, col):
-    """取单元格文本，越界视为空。"""
+    """取单元格文本，越界或占位格视为空。"""
     if col >= len(row):
         return ''
-    return str(row[col]).strip()
+    cell = row[col]
+    if isinstance(cell, TableCell):
+        if cell.is_placeholder:
+            return ''
+        return str(cell.text).strip()
+    return str(cell).strip()
 
 
 def calc_col_weights(rows, cols):
@@ -35,8 +41,8 @@ def calc_col_weights(rows, cols):
     while cols > 0:
         last_col = cols - 1
         last_col_empty = all(
-            (last_col >= len(rows[r]) or str(rows[r][last_col]).strip() == '')
-            for r in range(len(rows))
+            cell_text(row, last_col) == ''
+            for row in rows
         )
         if last_col_empty:
             cols -= 1
@@ -52,7 +58,9 @@ def calc_col_weights(rows, cols):
         header_w = 0
         content_widths = []
         for r in range(len(rows)):
-            w = text_width(rows[r][c]) if c < len(rows[r]) else 0
+            cell = rows[r][c] if c < len(rows[r]) else TableCell('', rowspan=0, colspan=0)
+            text = cell.text if isinstance(cell, TableCell) else str(cell)
+            w = text_width(text)
             if r == 0:
                 header_w = w
             else:
@@ -88,40 +96,28 @@ def trim_empty_tail_cols(rows):
 
 
 def calc_merge_info(rows, cols):
-    """计算合并单元格信息"""
+    """从 TableCell 元数据计算合并信息。
+
+    返回 merge_info[r][c] = (rowspan, text, colspan, is_tex) 或 None。
+    被 span 覆盖的占位格标记为 (0, '', 0, False)。
+    """
     merge_info = [[None for _ in range(cols)] for _ in range(len(rows))]
-    
-    def cell_val(r, c):
-        if c >= len(rows[r]):
-            return ''
-        return str(rows[r][c]).strip()
-    
-    # 先计算每列的合并范围
-    for c in range(cols):
-        r = 0
-        while r < len(rows):
-            val = cell_val(r, c)
-            if val == '':
-                r += 1
+
+    for r in range(len(rows)):
+        for c in range(cols):
+            if c >= len(rows[r]):
+                merge_info[r][c] = (0, '', 0, False)
                 continue
-            
-            # 计算向下合并的行数
-            span = 1
-            while r + span < len(rows):
-                if cell_val(r + span, c) == '':
-                    span += 1
-                else:
-                    break
-            
-            if span > 1:
-                merge_info[r][c] = (span, cell_val(r, c))
-                for k in range(1, span):
-                    merge_info[r + k][c] = (0, '')
+            cell = rows[r][c]
+            if not isinstance(cell, TableCell):
+                merge_info[r][c] = (1, str(cell).strip(), 1, False)
+                continue
+
+            if cell.is_placeholder:
+                merge_info[r][c] = (0, '', 0, False)
             else:
-                merge_info[r][c] = (1, val)
-            
-            r += span
-    
+                merge_info[r][c] = (cell.rowspan, cell.text, cell.colspan, cell.is_tex)
+
     return merge_info
 
 
@@ -130,7 +126,7 @@ def should_hint_rowspan_pagebreak(rows):
     return len(rows) >= 24
 
 
-def generate_table_tex(rows, caption=None):
+def generate_table_tex(rows, caption=None, caption_is_tex=False):
     """生成表格的 LaTeX 代码"""
     if not rows:
         return ''
@@ -153,8 +149,9 @@ def generate_table_tex(rows, caption=None):
     total_content_length = 0
     for r in range(row_count):
         for c in range(cols):
-            cell = str(rows[r][c]) if c < len(rows[r]) else ''
-            total_content_length += len(cell)
+            cell = rows[r][c] if c < len(rows[r]) else TableCell('', rowspan=0, colspan=0)
+            text = cell.text if isinstance(cell, TableCell) else str(cell)
+            total_content_length += len(text)
     
     # 估算每行平均高度（中文字符约 2 个单位，其他 1 个单位）
     avg_chars_per_row = total_content_length / max(row_count - 1, 1)  # 减去表头
@@ -197,7 +194,8 @@ def generate_table_tex(rows, caption=None):
         lines.append('\\noindent\\begin{minipage}{\\linewidth}')
         lines.append('\\centering')
         if caption:
-            lines.append(f'\\textbf{{{escape_tex(caption)}}}\\\\[0.5em]')
+            caption_text = caption if caption_is_tex else escape_tex(caption)
+            lines.append(f'\\textbf{{{caption_text}}}\\\\[0.5em]')
         lines.append(f'\\begin{{adjustbox}}{{max height={max_height}, center}}')
         lines.append(f'  \\begin{{tblr}}{{')
         lines.append(f'    width=\\linewidth,')
@@ -212,7 +210,8 @@ def generate_table_tex(rows, caption=None):
         # 大表：用 longtblr 跨页
         lines.append('\\begin{longtblr}[')
         if caption:
-            lines.append(f'  caption={{{escape_tex(caption)}}},')
+            caption_text = caption if caption_is_tex else escape_tex(caption)
+            lines.append(f'  caption={{{caption_text}}},')
         lines.append('  entry={none},')
         lines.append('  label={none},')
         lines.append(']{')
@@ -227,7 +226,12 @@ def generate_table_tex(rows, caption=None):
         lines.append('}')
     
     # 表头
-    header_cells = [escape_tex(str(cell)) for cell in rows[0]]
+    header_cells = []
+    for c in range(cols):
+        cell = rows[0][c] if c < len(rows[0]) else TableCell('', rowspan=0, colspan=0)
+        text = cell.text if isinstance(cell, TableCell) else str(cell)
+        is_tex = cell.is_tex if isinstance(cell, TableCell) else False
+        header_cells.append(str(text) if is_tex else escape_tex(str(text)))
     lines.append(f'  {" & ".join(header_cells)} \\\\')
     
     # 数据行
@@ -236,14 +240,21 @@ def generate_table_tex(rows, caption=None):
         cells = []
         for c in range(cols):
             info = merge_info[r][c]
-            if info is None:
+            if info is None or info[0] == 0:
                 cells.append('')
-            elif info[0] == 0:
-                cells.append('')
-            elif info[0] > 1:
-                cells.append(f'\\SetCell[r={info[0]}]{{l}} {escape_tex(info[1])}')
             else:
-                cells.append(escape_tex(info[1]))
+                rowspan, text, colspan, is_tex = info
+                # 已经是 tex 的内容跳过转义（sheet 数据走 escape_tex）
+                cell_content = text if is_tex else escape_tex(text)
+                if rowspan > 1 or colspan > 1:
+                    opts = []
+                    if rowspan > 1:
+                        opts.append(f'r={rowspan}')
+                    if colspan > 1:
+                        opts.append(f'c={colspan}')
+                    cells.append(f'\\SetCell[{", ".join(opts)}]{{l}} {cell_content}')
+                else:
+                    cells.append(cell_content)
         lines.append(f'  {" & ".join(cells)} \\\\')
     
     if not needs_pagebreak:

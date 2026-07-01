@@ -48,7 +48,7 @@ def main():
                 title = block.get('content', 'untitled')
                 break
             elif block.get('type') == 'heading' and block.get('level') == 1:
-                title = block.get('content', 'untitled')
+                title = block.get('raw_content', block.get('content', 'untitled'))
                 break
         
         print(f'文档标题: {title}')

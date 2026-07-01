@@ -3,20 +3,130 @@
 import json
 import subprocess
 import re
+import time
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 
 from .utils import escape_tex
 from .latex import parse_latex
 
+
+# ---- 重试配置 ----
+RETRY_ATTEMPTS = 3
+RETRY_BASE_DELAY = 1.0  # 指数退避基值（秒）
+
+
+@dataclass
+class TableCell:
+    """表格单元格，携带合并元数据。
+
+    rowspan/colspan 为 0 表示该格是占位符（被其他格 span 覆盖），
+    不应输出内容。
+    """
+    text: str = ''
+    rowspan: int = 1
+    colspan: int = 1
+    is_tex: bool = False
+
+    @property
+    def is_placeholder(self) -> bool:
+        return self.rowspan == 0 or self.colspan == 0
+
 # lark-cli 超时时间（秒）
 CLI_TIMEOUT = 60
-# 电子表格最大范围
-SHEET_MAX_ROWS = 100
-SHEET_MAX_COLS = 26
+# 电子表格安全上限（超过则截断并报告）
+SHEET_MAX_ROWS = 5000
+SHEET_MAX_COLS = 100
+
+
+def _col_to_letter(n):
+    """列号转字母: 1→A, 26→Z, 27→AA, 52→AZ, 53→BA, ..."""
+    if n < 1:
+        return 'A'
+    result = ''
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        result = chr(65 + rem) + result
+    return result
+
+
+def _build_range(row_count, col_count):
+    """根据行列数构建 A1 范围字符串: A1:{col_letter}{row_count}"""
+    if col_count <= 0 or row_count <= 0:
+        return 'A1:Z100'
+    return f'A1:{_col_to_letter(col_count)}{row_count}'
+
+
+def fetch_sheet_metadata(token, sheet_id):
+    """获取电子表格元数据（行数、列数），带重试。
+
+    返回 (row_count, column_count) 或 None。
+    """
+    cmd = [
+        'lark-cli', 'sheets', '+workbook-info',
+        '--spreadsheet-token', token,
+        '--format', 'json'
+    ]
+    try:
+        result = _run_with_retry(cmd)
+        data = json.loads(result.stdout)
+        sheets = data.get('data', {}).get('sheets', [])
+        for s in sheets:
+            if s.get('sheet_id') == sheet_id:
+                return s.get('row_count', 0), s.get('column_count', 0)
+        return None
+    except Exception:
+        return None
+
+
+def _should_retry(result):
+    """判断 lark-cli 结果是否需要重试。"""
+    if result.returncode != 0:
+        return True
+    output = (result.stderr or '') + (result.stdout or '')
+    if 'Internal error' in output:
+        return True
+    return False
+
+
+def _run_with_retry(cmd, attempts=RETRY_ATTEMPTS):
+    """运行 lark-cli 命令，带指数退避重试。
+
+    对非零退出码和 "Internal error" 自动重试。
+    最终失败抛出 Exception，含命令、退出码、stderr/stdout 摘要。
+    """
+    last_result = None
+    for attempt in range(1, attempts + 1):
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=CLI_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            if attempt < attempts:
+                time.sleep(RETRY_BASE_DELAY * (2 ** (attempt - 1)))
+                continue
+            raise Exception(
+                f'lark-cli 超时（{attempts}次重试后）\n'
+                f'  命令: {" ".join(cmd)}')
+
+        if not _should_retry(result):
+            return result
+
+        last_result = result
+        if attempt < attempts:
+            time.sleep(RETRY_BASE_DELAY * (2 ** (attempt - 1)))
+
+    stderr_summary = (last_result.stderr or '').strip()[:300]
+    stdout_summary = (last_result.stdout or '').strip()[:300]
+    raise Exception(
+        f'lark-cli 调用失败（{attempts}次重试后）\n'
+        f'  命令: {" ".join(cmd)}\n'
+        f'  退出码: {last_result.returncode}\n'
+        f'  stderr: {stderr_summary}\n'
+        f'  stdout: {stdout_summary}')
 
 
 def run_lark_cli(url):
-    """调用 lark-cli 获取文档内容"""
+    """调用 lark-cli 获取文档内容（自动重试）。"""
     cmd = [
         'lark-cli', 'docs', '+fetch',
         '--api-version', 'v2',
@@ -25,10 +135,14 @@ def run_lark_cli(url):
         '--detail', 'with-ids',
         '--format', 'json'
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=CLI_TIMEOUT)
-    if result.returncode != 0:
-        raise Exception(f'lark-cli 调用失败: {result.stderr}')
-    return json.loads(result.stdout)
+    result = _run_with_retry(cmd)
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        raise Exception(
+            f'lark-cli 返回非 JSON:\n'
+            f'  stdout: {(result.stdout or "").strip()[:300]}\n'
+            f'  stderr: {(result.stderr or "").strip()[:300]}')
 
 
 def extract_doc_info(response):
@@ -40,40 +154,76 @@ def extract_doc_info(response):
 
 
 def fetch_sheet_data(token, sheet_id):
-    """获取电子表格数据（最多 {SHEET_MAX_ROWS} 行 x {SHEET_MAX_COLS} 列）"""
+    """获取电子表格数据，按实际维度动态构建 range。
+
+    返回 (rows, warnings) 元组：
+      - rows: List[List[str]]，纯文本单元格数据
+      - warnings: List[str]，截断警告列表
+    """
+    warnings = []
+
+    # 1) 查元数据获取实际行列数
+    meta = fetch_sheet_metadata(token, sheet_id)
+    if meta:
+        row_count, col_count = meta
+    else:
+        # 回退到安全上限
+        row_count, col_count = SHEET_MAX_ROWS, SHEET_MAX_COLS
+        warnings.append(f'无法获取表格 {sheet_id} 的元数据，回退到最大 {row_count} 行 × {col_count} 列')
+
+    # 2) 检查是否需要截断
+    truncated_rows = row_count > SHEET_MAX_ROWS
+    truncated_cols = col_count > SHEET_MAX_COLS
+    effective_rows = min(row_count, SHEET_MAX_ROWS)
+    effective_cols = min(col_count, SHEET_MAX_COLS)
+
+    if truncated_rows or truncated_cols:
+        parts = []
+        if truncated_rows:
+            parts.append(f'行数 {row_count} → 截断至 {SHEET_MAX_ROWS}')
+        if truncated_cols:
+            parts.append(f'列数 {col_count} → 截断至 {SHEET_MAX_COLS}')
+        warnings.append(f'表格 {sheet_id} 超出上限: {"; ".join(parts)}')
+
+    # 3) 构建动态 range
+    range_str = _build_range(effective_rows, effective_cols)
+
     cmd = [
         'lark-cli', 'sheets', '+cells-get',
         '--spreadsheet-token', token,
         '--sheet-id', sheet_id,
-        '--range', f'A1:{chr(64 + SHEET_MAX_COLS)}{SHEET_MAX_ROWS}',
+        '--range', range_str,
         '--format', 'json'
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=CLI_TIMEOUT)
-    if result.returncode != 0:
-        return None
+    try:
+        result = _run_with_retry(cmd)
+    except Exception as e:
+        warnings.append(f'表格 {sheet_id} 获取失败（已重试）: {str(e)[:200]}')
+        return None, warnings
 
-    data = json.loads(result.stdout)
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        warnings.append(f'表格 {sheet_id} JSON 解析失败')
+        return None, warnings
+
     if not data.get('ok'):
-        return None
+        warnings.append(f'表格 {sheet_id} API 返回错误')
+        return None, warnings
 
-    # 提取单元格值
+    # 4) 提取单元格值，过滤全空行
     ranges = data.get('data', {}).get('ranges', [])
     if not ranges:
-        return None
+        return [], warnings
 
     cells = ranges[0].get('cells', [])
     rows = []
     for row in cells:
         row_values = [cell.get('value', '') for cell in row]
-        # 过滤全空行
         if any(str(v).strip() for v in row_values):
             rows.append(row_values)
 
-    # 警告：如果达到范围上限，数据可能被截断
-    if rows and len(rows) >= SHEET_MAX_ROWS:
-        print(f'  ⚠ 表格 {sheet_id} 行数达到上限 ({SHEET_MAX_ROWS})，数据可能不完整')
-
-    return rows if rows else None
+    return rows, warnings
 
 
 def parse_xml_content(xml_content):
@@ -112,8 +262,10 @@ def parse_element(elem):
     
     if tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
         level = int(tag[1])
-        # 使用 get_rich_text 保留富文本格式
-        return {'type': 'heading', 'level': level, 'content': get_rich_text(elem)}
+        raw_content = get_text(elem)
+        tex_content = get_rich_text(elem)
+        return {'type': 'heading', 'level': level,
+                'content': tex_content, 'raw_content': raw_content}
     
     if tag == 'p':
         content = get_rich_text(elem)
@@ -183,14 +335,108 @@ def parse_element(elem):
 
 
 def parse_table(table_elem):
-    """解析表格，处理 rowspan/colspan 合并"""
-    rows = []
-    
-    # 计算列数（从 colgroup 获取）
+    """解析表格，处理 rowspan/colspan 合并。
+
+    返回 grid: List[List[TableCell]]，每个格都带有完整的
+    rowspan/colspan 信息，被 span 覆盖的占位格 rowspan=colspan=0。
+    """
+    # 收集所有行
+    all_trs = _collect_table_rows(table_elem)
+
+    # 从 colgroup 获取声明的列数
     colgroup = table_elem.find('colgroup')
     num_cols = len(colgroup.findall('col')) if colgroup is not None else 0
-    
-    # 收集所有行
+
+    # ---- 第一遍：确定总列数 ----
+    pending = {}  # col_idx -> 剩余 rowspan 行数
+    max_col = 0
+
+    for tr in all_trs:
+        col_idx = 0
+        for cell in tr:
+            if cell.tag not in ('th', 'td'):
+                continue
+            # 跳过被 rowspan 占用的列
+            while col_idx in pending and pending[col_idx] > 0:
+                pending[col_idx] -= 1
+                if pending[col_idx] == 0:
+                    del pending[col_idx]
+                col_idx += 1
+
+            rowspan = int(cell.get('rowspan', '1'))
+            colspan = int(cell.get('colspan', '1'))
+
+            if rowspan > 1:
+                for dc in range(colspan):
+                    pending[col_idx + dc] = rowspan - 1
+
+            col_idx += colspan
+
+        # 尾部 pending 补位
+        while col_idx in pending and pending[col_idx] > 0:
+            pending[col_idx] -= 1
+            if pending[col_idx] == 0:
+                del pending[col_idx]
+            col_idx += 1
+
+        max_col = max(max_col, col_idx)
+
+    total_cols = max(num_cols, max_col)
+
+    # ---- 第二遍：构建 TableCell grid ----
+    pending = {}
+    grid = []
+
+    for tr in all_trs:
+        row = [TableCell('', rowspan=0, colspan=0) for _ in range(total_cols)]
+        col_idx = 0
+
+        for cell in tr:
+            if cell.tag not in ('th', 'td'):
+                continue
+
+            # 跳过被 rowspan 占用的列，填占位符
+            while col_idx in pending and pending[col_idx] > 0:
+                row[col_idx] = TableCell('', rowspan=0, colspan=0)
+                pending[col_idx] -= 1
+                if pending[col_idx] == 0:
+                    del pending[col_idx]
+                col_idx += 1
+
+            rowspan = int(cell.get('rowspan', '1'))
+            colspan = int(cell.get('colspan', '1'))
+            text = get_rich_text(cell)
+
+            row[col_idx] = TableCell(text, rowspan, colspan, is_tex=True)
+
+            # 标记 rowspan
+            if rowspan > 1:
+                for dc in range(colspan):
+                    pending[col_idx + dc] = rowspan - 1
+
+            # 标记 colspan 占位格
+            for dc in range(1, colspan):
+                nc = col_idx + dc
+                if nc < total_cols:
+                    row[nc] = TableCell('', rowspan=0, colspan=0)
+
+            col_idx += colspan
+
+        # 尾部 pending 补占位符
+        while col_idx in pending and pending[col_idx] > 0:
+            row[col_idx] = TableCell('', rowspan=0, colspan=0)
+            pending[col_idx] -= 1
+            if pending[col_idx] == 0:
+                del pending[col_idx]
+            col_idx += 1
+
+        grid.append(row)
+
+    return {'type': 'table', 'rows': grid}
+
+
+def _collect_table_rows(table_elem):
+    """收集表格中的所有 <tr> 行（先 thead 再 tbody）。"""
     all_trs = []
     thead = table_elem.find('thead')
     if thead is not None:
@@ -200,54 +446,7 @@ def parse_table(table_elem):
         all_trs.extend(tbody.findall('tr'))
     if not all_trs:
         all_trs = table_elem.findall('tr')
-    
-    # 处理 rowspan：记录需要填充的空位
-    # pending[row][col] = 剩余需要跳过的行数
-    pending = {}
-    
-    for tr in all_trs:
-        row = []
-        col_idx = 0
-        
-        for cell in tr:
-            if cell.tag not in ('th', 'td'):
-                continue
-            
-            # 跳过被 rowspan 占用的列
-            while col_idx in pending and pending[col_idx] > 0:
-                row.append('')
-                pending[col_idx] -= 1
-                if pending[col_idx] == 0:
-                    del pending[col_idx]
-                col_idx += 1
-            
-            # 获取 rowspan
-            rowspan = int(cell.get('rowspan', '1'))
-            
-            # 添加单元格内容
-            row.append(get_text(cell))
-            
-            # 如果 rowspan > 1，记录需要跳过的行数
-            if rowspan > 1:
-                pending[col_idx] = rowspan - 1
-            
-            col_idx += 1
-        
-        # 填充剩余被 rowspan 占用的列
-        while col_idx in pending and pending[col_idx] > 0:
-            row.append('')
-            pending[col_idx] -= 1
-            if pending[col_idx] == 0:
-                del pending[col_idx]
-            col_idx += 1
-        
-        # 补齐到固定列数
-        while num_cols > 0 and len(row) < num_cols:
-            row.append('')
-        
-        rows.append(row)
-    
-    return {'type': 'table', 'rows': rows}
+    return all_trs
 
 
 def get_text(elem):

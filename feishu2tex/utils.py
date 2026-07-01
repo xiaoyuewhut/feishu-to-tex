@@ -6,17 +6,47 @@ from urllib.parse import urlparse
 
 
 def strip_heading_number(text):
-    """去掉标题开头的数字序号，如 '1.1 xxx' -> 'xxx', '2.' -> '2'"""
-    # 匹配开头的数字序号: 1. / 1.1 / 1.1.1 / 1.1.1.1 等
-    # 排除十六进制数（如 0x27）和版本号（如 v2.0）
+    """去掉标题开头的数字序号（作用于原始文本）。"""
+    return _strip_heading_raw(text)[1]
+
+
+def strip_heading_tex(raw_text, tex_text):
+    """从标题的 raw 和 tex 两端去掉数字序号，返回可用于 LaTeX 输出的文本。
+
+    先对 raw_text 做 strip，再将对应的序号前缀从 tex_text 移除。
+    若 tex_text 中找不到序号（比如序号被 LaTeX 命令包裹），则回退到
+    直接对 tex_text 做正则 strip。
+    """
+    prefix, raw_suffix = _strip_heading_raw(raw_text)
+    if not prefix:
+        return tex_text
+
+    # 在 tex_text 中查找并移除同样的前缀
+    idx = tex_text.find(prefix)
+    if idx >= 0:
+        end = idx + len(prefix)
+        if end < len(tex_text) and tex_text[end] == ' ':
+            end += 1
+        stripped = (tex_text[:idx] + tex_text[end:]).strip()
+        # 如果 tex 前缀被移除后为空，保留后缀
+        if stripped:
+            return stripped
+
+    # 回退：直接对 tex_text 做正则 strip
+    return strip_heading_number(tex_text)
+
+
+def _strip_heading_raw(text):
+    """去掉标题开头的数字序号。
+    返回 (prefix, suffix)，若无需 strip 则 prefix 为 None。
+    """
     m = re.match(r'^([\d]+(\.[\d]+)*\.?)\s*(?![xX\d])', text)
     if m and m.group(1):
-        rest = text[m.end():].strip()
-        # 如果去掉序号后为空，保留数字部分（去掉末尾的点）
-        if not rest:
-            return m.group(1).rstrip('.')
-        return rest
-    return text
+        suffix = text[m.end():].strip()
+        if not suffix:
+            return m.group(1).rstrip('.'), ''
+        return m.group(1), suffix
+    return None, text
 
 
 def escape_tex(text):
@@ -118,3 +148,60 @@ def guess_image_ext(url):
     if ext in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'):
         return '.jpg' if ext == '.jpeg' else ext
     return '.png'
+
+
+def is_svg_file(filepath):
+    """检测文件是否为 SVG（按扩展名或文件头）。"""
+    if filepath.lower().endswith('.svg'):
+        return True
+    try:
+        with open(filepath, 'rb') as f:
+            head = f.read(200).decode('utf-8', errors='ignore')
+            return '<svg' in head.lower() or '<!doctype svg' in head.lower()
+    except Exception:
+        return False
+
+
+def convert_svg_to_png(svg_path):
+    """将 SVG 转换为 PNG，返回 PNG 路径或 None。
+
+    优先使用 macOS qlmanage，其次尝试 rsvg-convert / inkscape。
+    """
+    png_path = svg_path + '.png'
+
+    # 尝试 qlmanage (macOS)
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['qlmanage', '-t', '-s', '1200', '-o',
+             os.path.dirname(svg_path), svg_path],
+            capture_output=True, text=True, timeout=30)
+        if result.returncode == 0 and os.path.exists(png_path):
+            return png_path
+    except Exception:
+        pass
+
+    # 尝试 rsvg-convert
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['rsvg-convert', '-w', '1200', '-o', png_path, svg_path],
+            capture_output=True, text=True, timeout=30)
+        if result.returncode == 0 and os.path.exists(png_path):
+            return png_path
+    except Exception:
+        pass
+
+    # 尝试 inkscape
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['inkscape', '--export-type=png', '--export-width=1200',
+             f'--export-filename={png_path}', svg_path],
+            capture_output=True, text=True, timeout=30)
+        if result.returncode == 0 and os.path.exists(png_path):
+            return png_path
+    except Exception:
+        pass
+
+    return None
