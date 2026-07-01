@@ -39,7 +39,7 @@ def _extract_table_caption(blocks, i, table_block):
         prev_block['used'] = True
 
 
-def create_project(blocks, title, doc_id, output_dir):
+def create_project(blocks, title, doc_id, output_dir, source_url=None):
     """创建 LaTeX 项目"""
     # 生成文件夹名
     folder_name = to_folder_name(title, doc_id)
@@ -156,6 +156,7 @@ def create_project(blocks, title, doc_id, output_dir):
     metadata = {
         'title': title,
         'doc_id': doc_id,
+        'source_url': source_url,
         'exported_at': datetime.now().isoformat(),
         'block_count': len(blocks),
         'section_count': len(sections),
@@ -168,6 +169,7 @@ def create_project(blocks, title, doc_id, output_dir):
     report = {
         'title': title,
         'doc_id': doc_id,
+        'source_url': source_url,
         'timestamp': datetime.now().isoformat(),
         'total_blocks': len(blocks),
         'total_sections': len(sections),

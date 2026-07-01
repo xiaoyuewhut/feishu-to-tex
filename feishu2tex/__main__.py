@@ -55,7 +55,7 @@ def main():
         
         # 创建项目
         print('正在生成 LaTeX 项目...')
-        project_dir, folder_name = create_project(blocks, title, doc_id, output_dir)
+        project_dir, folder_name = create_project(blocks, title, doc_id, output_dir, source_url=url)
         
         print(f'\n✓ 完成!')
         print(f'  项目目录: {project_dir}')
